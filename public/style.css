@@ -26,3 +26,7 @@
 .completion-note a{color:#90d8ee;text-decoration:none}
 .completion-note a:hover{text-decoration:underline}
 @media(max-width:800px){.delivery-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.completion-gate{gap:8px;flex-wrap:wrap}.gate-details{flex-basis:calc(100% - 55px)}}
+
+.work-controls{display:flex;gap:9px;flex-wrap:wrap;margin:17px 0}.work-controls button{font-size:12px}
+.action-help{color:#f8cc9b;padding:0 0 9px;min-height:24px;font-size:13px}.audit-rows:empty{display:none}
+.audit-rows{padding:0 0 10px}.audit-rows h4{margin:4px 0 10px}.audit-line{font-size:12px;padding:7px 2px;border-bottom:1px solid #2a3848;color:#aabbcc;overflow-wrap:anywhere}

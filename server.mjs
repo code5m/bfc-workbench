@@ -75,6 +75,37 @@ async function atomicJson(path,data){
  await writeFile(temp,JSON.stringify(data,null,2),{mode:0o600});
  await chmod(temp,0o600);await rename(temp,path);
 }
+async function exportReview(){
+ const overrides=await readJson('manual-review-overrides.json')||{version:1,decisions:{}};
+ const flow=await getWorkflow();
+ return {version:1,type:'local_review_backup',generatedAt:new Date().toISOString(),decisions:overrides.decisions,
+         count:Object.keys(overrides.decisions).length,accountWrites:0,blocked:flow.blocked};
+}
+async function auditOverview(){
+ const flow=await getWorkflow();
+ let logs=[];
+ try{logs=(await readFile(join(dataDir,'local-review-audit.jsonl'),'utf8')).trim().split('\n').filter(Boolean).slice(-35).map(x=>{
+   try{return JSON.parse(x)}catch{return {action:'unreadable_audit_line'}} }).reverse();}catch{}
+ return {logs,guard:{blocked:flow.blocked,reason:flow.reason},localApproved:flow.stats.manual,
+         unreviewed:flow.stats.conflict+flow.stats.unclassified+flow.stats.descriptionReview};
+}
+async function restoreReview(input){
+ if(!input||input.type!=='local_review_backup'||input.version!==1||!input.decisions||typeof input.decisions!=='object'||Array.isArray(input.decisions))throw new Error('invalid_review_backup');
+ const entries=Object.entries(input.decisions);
+ if(entries.length>50)throw new Error('too_many_entries_for_small_body');
+ const flow=await getWorkflow(),valid=new Set(flow.videos.filter(x=>x.decision!=='invalid').map(x=>x.bvid));
+ const clean=Object.create(null);
+ for(const [bvid,d] of entries){
+  if(!/^BV[0-9a-zA-Z]{8,20}$/.test(bvid)||!valid.has(bvid)||!validTopic(d?.topic))throw new Error('invalid_review_entry');
+  clean[bvid]={topic:d.topic,updatedAt:new Date().toISOString(),source:'local_review_backup_restore'};
+ }
+ const old=await readJson('manual-review-overrides.json')||{version:1,decisions:{}};
+ await atomicJson(join(dataDir,'manual-review-backup-previous.json'),old);
+ await atomicJson(join(dataDir,'manual-review-overrides.json'),{version:1,decisions:clean});
+ const log=join(dataDir,'local-review-audit.jsonl');
+ await appendFile(log,JSON.stringify({when:new Date().toISOString(),action:'restore_local_review_backup',count:entries.length})+'\n',{mode:0o600});
+ return {ok:true,restored:entries.length,previousBackupAvailable:true,accountWrites:0};
+}
 let reviewQueue=Promise.resolve();
 async function saveReview(input){
  const op=reviewQueue.then(async()=>{
@@ -123,6 +154,14 @@ export function createApp(){
   try{
    if(req.method==='GET'&&route==='/api/status'){sendJson(res,200,await snapshot());return;}
    if(req.method==='GET'&&route==='/api/completion'){sendJson(res,200,(await snapshot()).completion);return;}
+   if(req.method==='GET'&&route==='/api/review/export'){sendJson(res,200,await exportReview(),{'Content-Disposition':'attachment; filename="bilibili-local-reviews.json"'});return;}
+   if(req.method==='GET'&&route==='/api/audit'){sendJson(res,200,await auditOverview());return;}
+   if(req.method==='GET'&&route==='/api/health'){sendJson(res,200,{ok:true,localOnly:true,bilibiliNetworkRequests:0});return;}
+   if(req.method==='POST'&&route==='/api/review/restore'){
+    if(!reviewAuth(req)){sendJson(res,403,{error:'csrf_or_origin_mismatch'});return;}
+    try{const input=await loadSmallBody(req);sendJson(res,200,await restoreReview(input));}
+    catch(e){sendJson(res,400,{error:e.message});}return;
+   }
    if(req.method==='GET'&&route==='/api/session'){sendJson(res,200,{token:csrf,categories:Object.keys(TARGETS)});return;}
    if(req.method==='GET'&&route==='/api/videos'){
     const workflow=await getWorkflow();

@@ -19,6 +19,19 @@
 <div class="columns"><section class="panel"><div class="section-head"><h3>主题分布</h3><span>按唯一 BV 统计</span></div><div id="topics"></div></section><section class="panel"><div class="section-head"><h3>完成路线</h3><span>真实执行状态</span></div><div id="actions"></div></section></div>
 <section class="panel"><div class="section-head"><h3>离线整理与复核</h3><button id="export-plan" type="button" class="outlined">导出待核实同步清单</button></div>
 <p class="muted">这里的分类确认仅保存到本机，不会自动写入 B站。跨类别冲突优先复核。</p><div id="local-review-stats" class="muted"></div>
+<div class="work-controls">
+  <button type="button" id="refresh-all" class="outlined">刷新本地数据</button>
+  <button type="button" id="show-audit" class="outlined">查看审核日志</button>
+  <button type="button" id="backup-review" class="outlined">备份人工分类</button>
+  <button type="button" id="restore-review" class="outlined">恢复人工分类</button>
+  <button type="button" id="undo-review" class="outlined">撤销上一条人工分类</button>
+  <button type="button" id="scan-help" class="outlined">继续扫描 · 查看阻塞</button>
+  <button type="button" id="sync-help" class="outlined">账号同步 · 查看条件</button>
+  <button type="button" id="cleanup-help" class="outlined">清理默认夹 · 查看条件</button>
+</div>
+<input id="restore-file" type="file" accept=".json,application/json" hidden>
+<div id="action-help" class="action-help" aria-live="polite"></div>
+<div id="audit-rows" class="audit-rows"></div>
 <div class="review-filters"><input type="search" id="review-search" placeholder="按视频标题或 BV 号搜索"><select id="review-filter"><option value="review">待复核</option><option value="classified">已有分类建议</option><option value="invalid">失效视频</option><option value="all">全部视频</option></select></div>
 <p id="review-message" class="muted" aria-live="polite"></p><div id="review-items"></div>
 <div class="pagination"><span id="review-total"></span><button id="prev" type="button" class="outlined">上一页</button><button id="next" type="button" class="outlined">下一页</button></div></section>

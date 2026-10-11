@@ -93,6 +93,7 @@ async function readVideos(){
     try{
      const r=await fetch('/api/review',{method:'POST',headers:{'Content-Type':'application/json','X-Local-CSRF':session.token},body:JSON.stringify({bvid:item.bvid,topic:select.value})});
      const result=await r.json();if(!r.ok)throw Error(result.error||'保存失败');
+     lastManualBvid=item.bvid;
      $('review-message').textContent='已保存本地分类：'+item.title+' → '+select.value+'（未同步至B站）';
      await Promise.all([readVideos(),refresh()]);
     }catch(e){$('review-message').textContent=String(e);}finally{save.disabled=false;}
@@ -110,4 +111,55 @@ async function bootstrap(){
  $('export-plan').onclick=()=>{window.location.href='/api/export-plan';};
  await readVideos();
 }
-refresh();bootstrap();setInterval(refresh,30000);
+let lastManualBvid=null;
+async function showAudit(){
+ const r=await fetch('/api/audit');if(!r.ok)throw Error('读取审计失败');
+ const d=await r.json(),out=$('audit-rows');out.replaceChildren();
+ elem(out,'h4','最近本地审核操作');
+ if(!d.logs.length)elem(out,'p','尚无人工审核操作记录','muted');
+ for(const log of d.logs){
+  const text=[log.when||'',log.action||'',log.bvid||'',log.topic||'',log.count??''].filter(Boolean).join(' · ');
+  elem(out,'div',text,'audit-line');
+ }
+}
+function help(kind){
+ const messages={
+ scan:'扫描尚未开放：当前 B站 HTTP 412 熔断生效。不能在页面绕过账号保护；需要平台正常授权恢复，之后才可安全续读。',
+ sync:'账号同步尚未开放：需要获准的写入工具、目标收藏夹实时去重、逐批写入和回读证明。导出的 JSON 只是离线计划。',
+ cleanup:'清理默认收藏夹尚未开放：必须先完成全部分页读取、确认目标收藏成功并回读，再在明确授权下安全移出，且须保留恢复证据。',
+ };
+ $('action-help').textContent=messages[kind]||'';
+}
+async function wireControls(){
+ $('refresh-all').onclick=async()=>{await Promise.all([refresh(),readVideos()]);$('action-help').textContent='已刷新本地文件（没有访问 B站）。';};
+ $('show-audit').onclick=async()=>{try{await showAudit();$('action-help').textContent='本地审核日志已展开。';}catch(e){$('action-help').textContent=String(e);}};
+ $('backup-review').onclick=()=>{window.location.href='/api/review/export';$('action-help').textContent='已请求导出本地人工分类备份。';};
+ $('restore-review').onclick=()=>$('restore-file').click();
+ $('restore-file').onchange=async(e)=>{
+  const f=e.target.files?.[0];if(!f)return;
+  if(f.size>4096){$('action-help').textContent='备份文件超过 4KB 限额。请先拆分，不能绕过接口限制。';return;}
+  try{
+   const data=JSON.parse(await f.text());
+   if(!window.confirm('只恢复本地人工分类，不修改 B站账号。是否继续？'))return;
+   const r=await fetch('/api/review/restore',{method:'POST',headers:{'Content-Type':'application/json','X-Local-CSRF':session.token},body:JSON.stringify(data)});
+   const result=await r.json();if(!r.ok)throw Error(result.error);
+   $('action-help').textContent='成功恢复 '+result.restored+' 条本地人工分类；原备份已保存。';
+   await Promise.all([refresh(),readVideos()]);
+  }catch(error){$('action-help').textContent='恢复失败：'+String(error);}
+  finally{$('restore-file').value='';}
+ };
+ $('undo-review').onclick=async()=>{
+  if(!lastManualBvid){$('action-help').textContent='本次页面会话尚无可以撤销的人工分类。';return;}
+  if(!window.confirm('撤销 '+lastManualBvid+' 的本地人工分类？'))return;
+  try{
+   const r=await fetch('/api/review',{method:'POST',headers:{'Content-Type':'application/json','X-Local-CSRF':session.token},body:JSON.stringify({bvid:lastManualBvid,topic:null})});
+   const d=await r.json();if(!r.ok)throw Error(d.error);
+   $('action-help').textContent='本地分类已撤销（没有修改 B站）。';lastManualBvid=null;
+   await Promise.all([refresh(),readVideos()]);
+  }catch(e){$('action-help').textContent=String(e);}
+ };
+ $('scan-help').onclick=()=>help('scan');
+ $('sync-help').onclick=()=>help('sync');
+ $('cleanup-help').onclick=()=>help('cleanup');
+}
+refresh();bootstrap().then(wireControls);setInterval(refresh,30000);
