@@ -1,8 +1,13 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>B站收藏夹整理工作台</title><link rel="stylesheet" href="/style.css"></head><body><div id="app">
-<header><div class="eyebrow">PERSONAL KNOWLEDGE SYSTEM · 本地只读</div><h1>B站收藏夹整理工作台</h1><p>从收藏到知识库，真实进度、阻塞原因与后续行动一目了然。</p><span id="access" class="pill">读取本地状态中...</span></header>
-<main><section class="hero"><div><div class="eyebrow">当前运行模式</div><h2 id="headline">正在读取本地快照</h2><p id="subhead">不访问 B站接口，不改变原有收藏。</p></div><div class="round" id="coverage">—</div></section>
-<div class="stats"><article><span>已保存收藏关系</span><strong id="memberships">—</strong><small>离线快照，不等于账号全量</small></article><article><span>不同视频 BV 号</span><strong id="unique">—</strong><small>跨收藏夹去重统计</small></article><article><span>已生成分类建议</span><strong id="classified">—</strong><small>基于目录和标题的推断</small></article><article><span>首轮成功复制</span><strong id="copied">—</strong><small>第二轮尚未完成</small></article></div>
-<div class="columns"><section class="panel"><div class="section-head"><h3>主题分布</h3><span>本地分类</span></div><div id="topics"></div></section><section class="panel"><div class="section-head"><h3>下一步工作</h3><span>真实执行状态</span></div><div id="actions"></div></section></div>
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>B站收藏夹整理工作台</title><link rel="stylesheet" href="/style.css"></head><body><div id="app">
+<header><div class="eyebrow">PERSONAL KNOWLEDGE SYSTEM · 本地优先</div><h1>B站收藏夹整理工作台</h1><p>收藏资产、整理复核和账号同步的可核验进度。</p><span id="access" class="pill">读取本地状态中...</span></header>
+<main><section class="hero"><div><div class="eyebrow">当前运行状态</div><h2 id="headline">正在读取本地快照</h2><p id="subhead">不访问 B站接口，不改变原有收藏。</p></div><div class="round" id="coverage">—</div></section>
+<div class="stats"><article><span>已保存收藏关系</span><strong id="memberships">—</strong><small>离线快照，不等于账号全量</small></article><article><span>不同视频 BV 号</span><strong id="unique">—</strong><small>跨收藏夹去重统计</small></article><article><span>视频分类建议</span><strong id="classified">—</strong><small>唯一 BV 口径，未全部审核</small></article><article><span>首轮成功复制</span><strong id="copied">—</strong><small>第二轮尚未完成</small></article></div>
+<div class="columns"><section class="panel"><div class="section-head"><h3>主题分布</h3><span>按唯一 BV 统计</span></div><div id="topics"></div></section><section class="panel"><div class="section-head"><h3>完成路线</h3><span>真实执行状态</span></div><div id="actions"></div></section></div>
+<section class="panel"><div class="section-head"><h3>离线整理与复核</h3><button id="export-plan" type="button" class="outlined">导出待核实同步清单</button></div>
+<p class="muted">这里的分类确认仅保存到本机，不会自动写入 B站。跨类别冲突优先复核。</p><div id="local-review-stats" class="muted"></div>
+<div class="review-filters"><input type="search" id="review-search" placeholder="按视频标题或 BV 号搜索"><select id="review-filter"><option value="review">待复核</option><option value="classified">已有分类建议</option><option value="invalid">失效视频</option><option value="all">全部视频</option></select></div>
+<p id="review-message" class="muted" aria-live="polite"></p><div id="review-items"></div>
+<div class="pagination"><span id="review-total"></span><button id="prev" type="button" class="outlined">上一页</button><button id="next" type="button" class="outlined">下一页</button></div></section>
 <section class="panel"><div class="section-head"><h3>收藏夹扫描覆盖率</h3><span id="coverage-label"></span></div><div id="folders"></div></section>
-<footer>本地工作台 · 只读查看 · 账号凭据与私密收藏不会上传到 GitHub · <span id="updated">尚未更新</span></footer>
+<footer>仅本地读写分类复核记录 · 不会请求 B站账号写入接口 · 用户数据不上传 GitHub · <span id="updated">尚未更新</span></footer>
 </main></div><script src="/app.js" defer></script></body></html>
