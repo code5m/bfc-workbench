@@ -1,0 +1,8 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>B站收藏夹整理工作台</title><link rel="stylesheet" href="/style.css"></head><body><div id="app">
+<header><div class="eyebrow">PERSONAL KNOWLEDGE SYSTEM · 本地只读</div><h1>B站收藏夹整理工作台</h1><p>从收藏到知识库，真实进度、阻塞原因与后续行动一目了然。</p><span id="access" class="pill">读取本地状态中...</span></header>
+<main><section class="hero"><div><div class="eyebrow">当前运行模式</div><h2 id="headline">正在读取本地快照</h2><p id="subhead">不访问 B站接口，不改变原有收藏。</p></div><div class="round" id="coverage">—</div></section>
+<div class="stats"><article><span>已保存收藏关系</span><strong id="memberships">—</strong><small>离线快照，不等于账号全量</small></article><article><span>不同视频 BV 号</span><strong id="unique">—</strong><small>跨收藏夹去重统计</small></article><article><span>已生成分类建议</span><strong id="classified">—</strong><small>基于目录和标题的推断</small></article><article><span>首轮成功复制</span><strong id="copied">—</strong><small>第二轮尚未完成</small></article></div>
+<div class="columns"><section class="panel"><div class="section-head"><h3>主题分布</h3><span>本地分类</span></div><div id="topics"></div></section><section class="panel"><div class="section-head"><h3>下一步工作</h3><span>真实执行状态</span></div><div id="actions"></div></section></div>
+<section class="panel"><div class="section-head"><h3>收藏夹扫描覆盖率</h3><span id="coverage-label"></span></div><div id="folders"></div></section>
+<footer>本地工作台 · 只读查看 · 账号凭据与私密收藏不会上传到 GitHub · <span id="updated">尚未更新</span></footer>
+</main></div><script src="/app.js" defer></script></body></html>
