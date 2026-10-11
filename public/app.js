@@ -2,6 +2,30 @@ const $=id=>document.getElementById(id);
 let session=null,currentPage=1,currentState='review',currentQuery='';
 const format=n=>new Intl.NumberFormat('zh-CN').format(n??0);
 function elem(parent,tag,value,cls){const el=document.createElement(tag);if(value!==undefined)el.textContent=String(value);if(cls)el.className=cls;parent.append(el);return el;}
+function drawCompletion(result){
+ if(!result)return;
+ const info=result.defaultFolder||{};
+ $('completion-status').textContent=result.allDone?'全部完成 · 已验收':'未完成 · 必须继续';
+ $('completion-status').className='completion-state '+(result.allDone?'passed':'unmet');
+ $('default-reported').textContent=info.historicalReported===null?'未知':format(info.historicalReported);
+ $('default-observed').textContent=info.observed===null?'未知':format(info.observed);
+ $('default-unseen').textContent=info.notObservedEstimate===null?'未知':format(info.notObservedEstimate);
+ $('default-cleared').textContent=info.accountConfirmedRemoved===null?'尚无回读证据':format(info.accountConfirmedRemoved);
+ const pct=Math.max(0,Math.min(100,Number(info.observedRatio)||0));
+ $('default-coverage').textContent=pct.toFixed(1)+'%';
+ $('default-read-bar').style.width=pct+'%';
+ $('completion-gate-count').textContent=result.passed+'/'+result.total+' 项真实通过';
+ const out=$('completion-gates');out.replaceChildren();
+ for(const g of result.gates||[]){
+   const row=elem(out,'div',undefined,'completion-gate');
+   elem(row,'span',g.id,'gate-index');
+   const details=elem(row,'div',undefined,'gate-details');
+   elem(details,'b',g.title);
+   elem(details,'small',g.detail);
+   const state=g.status==='passed'?'已通过':g.status==='blocked'?'受阻':'未通过';
+   elem(row,'span',state,'gate-state '+g.status);
+ }
+}
 function drawStatus(d){
  const blocked=d.access.blocked;
  $('access').textContent=blocked?'访问状态：HTTP 412 安全暂停':'访问状态：仅本地分析';
@@ -36,6 +60,7 @@ function drawStatus(d){
  });
  $('coverage-label').textContent=d.folders.filter(f=>f.complete).length+'/'+d.folders.length+' 个文件夹完成遍历';
  $('local-review-stats').textContent='待复核 '+format(d.workflow.stats.conflict+d.workflow.stats.descriptionReview+d.workflow.stats.unclassified)+' 条 · 冲突 '+d.workflow.stats.conflict+' 条 · 本地确认 '+d.workflow.stats.manual+' 条';
+ drawCompletion(d.completion);
  $('updated').textContent='最近刷新：'+new Date().toLocaleString('zh-CN');
 }
 async function refresh(){

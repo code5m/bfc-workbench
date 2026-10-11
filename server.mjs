@@ -5,6 +5,7 @@ import {homedir} from 'node:os';
 import {resolve,join,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {deriveWorkflow,pageVideos,validTopic,TARGETS} from './lib/workflow.mjs';
+import {assessCompletion} from './lib/completion.mjs';
 
 const root=dirname(fileURLToPath(import.meta.url));
 const dataDir=process.env.BILIBILI_FAVORITES_DATA_DIR || join(homedir(),'Documents','Bilibili-Favorites-Review');
@@ -34,12 +35,13 @@ export function summarize({inventory,classification,guard,copy,desc}={}){
 }
 
 async function readSources(){
- const [inventory,classification,guard,copy,desc,overrides]=await Promise.all([
+ const [inventory,classification,guard,copy,desc,overrides,finalEvidence]=await Promise.all([
   readJson('inventory-rescan-v2.json'),readJson('v3-classification.json'),
   readJson('account-access-guard.json'),readJson('copy-summary.json'),
-  readJson('description-review.json'),readJson('manual-review-overrides.json')
+  readJson('description-review.json'),readJson('manual-review-overrides.json'),
+  readJson('final-acceptance-evidence.json')
  ]);
- return {inventory,classification,guard,copy,desc,overrides};
+ return {inventory,classification,guard,copy,desc,overrides,finalEvidence};
 }
 export async function snapshot(){
  const src=await readSources();
@@ -47,6 +49,7 @@ export async function snapshot(){
  const workflow=deriveWorkflow({inventory:src.inventory,classification:src.classification,
    description:src.desc,overrides:src.overrides,guard:src.guard,copySummary:src.copy});
  summary.workflow={stats:workflow.stats,milestones:workflow.milestones};
+ summary.completion=assessCompletion({inventory:src.inventory,workflow,guard:src.guard,finalEvidence:src.finalEvidence});
  return summary;
 }
 async function getWorkflow(){
@@ -119,6 +122,7 @@ export function createApp(){
   const route=url.pathname;
   try{
    if(req.method==='GET'&&route==='/api/status'){sendJson(res,200,await snapshot());return;}
+   if(req.method==='GET'&&route==='/api/completion'){sendJson(res,200,(await snapshot()).completion);return;}
    if(req.method==='GET'&&route==='/api/session'){sendJson(res,200,{token:csrf,categories:Object.keys(TARGETS)});return;}
    if(req.method==='GET'&&route==='/api/videos'){
     const workflow=await getWorkflow();

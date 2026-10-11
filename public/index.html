@@ -2,6 +2,20 @@
 <header><div class="eyebrow">PERSONAL KNOWLEDGE SYSTEM · 本地优先</div><h1>B站收藏夹整理工作台</h1><p>收藏资产、整理复核和账号同步的可核验进度。</p><span id="access" class="pill">读取本地状态中...</span></header>
 <main><section class="hero"><div><div class="eyebrow">当前运行状态</div><h2 id="headline">正在读取本地快照</h2><p id="subhead">不访问 B站接口，不改变原有收藏。</p></div><div class="round" id="coverage">—</div></section>
 <div class="stats"><article><span>已保存收藏关系</span><strong id="memberships">—</strong><small>离线快照，不等于账号全量</small></article><article><span>不同视频 BV 号</span><strong id="unique">—</strong><small>跨收藏夹去重统计</small></article><article><span>视频分类建议</span><strong id="classified">—</strong><small>唯一 BV 口径，未全部审核</small></article><article><span>首轮成功复制</span><strong id="copied">—</strong><small>第二轮尚未完成</small></article></div>
+<section class="panel completion-panel" id="completion-panel">
+  <div class="section-head"><h3><span class="p0-marker">P0</span> 最终交付目标：默认收藏夹全部整理完成</h3><span id="completion-status" class="completion-state">核验中</span></div>
+  <p class="completion-mission">验收不是“本地分类完成”，而是每个有效视频真正进入 B站正确分类夹、成功回读，并安全清理默认夹中的原始收藏关系。严禁漏项或误删。</p>
+  <div class="delivery-stats">
+    <div><span>默认夹历史报告总量</span><strong id="default-reported">—</strong></div>
+    <div><span>已读取收藏关系</span><strong id="default-observed">—</strong></div>
+    <div><span>尚未观察（估算）</span><strong id="default-unseen">—</strong></div>
+    <div><span>默认夹已移出且已验证</span><strong id="default-cleared">无证据</strong></div>
+  </div>
+  <div class="completion-coverage"><div class="folder-meta"><span>默认收藏夹读取覆盖率（不是整理完成率）</span><b id="default-coverage">—</b></div><div class="track"><div class="fill" id="default-read-bar"></div></div></div>
+  <div class="completion-gate-header"><strong>G1–G8 强制验收清单</strong><span id="completion-gate-count">—</span></div>
+  <div id="completion-gates"></div>
+  <p class="completion-note">全部门禁真实通过前，状态永远是“未完成”。 <a href="https://github.com/code5m/bilibili-favorites-workbench/blob/main/docs/COMPLETION_CONTRACT.md" target="_blank" rel="noopener noreferrer">查看正式交付契约 ↗</a></p>
+</section>
 <div class="columns"><section class="panel"><div class="section-head"><h3>主题分布</h3><span>按唯一 BV 统计</span></div><div id="topics"></div></section><section class="panel"><div class="section-head"><h3>完成路线</h3><span>真实执行状态</span></div><div id="actions"></div></section></div>
 <section class="panel"><div class="section-head"><h3>离线整理与复核</h3><button id="export-plan" type="button" class="outlined">导出待核实同步清单</button></div>
 <p class="muted">这里的分类确认仅保存到本机，不会自动写入 B站。跨类别冲突优先复核。</p><div id="local-review-stats" class="muted"></div>
