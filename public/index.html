@@ -33,6 +33,14 @@
 <div class="track"><div id="executor-progress" class="fill" style="width:0%"></div></div>
 <div id="executor-states" class="muted"></div>
 </section>
+<section class="panel" id="expanded-local-review">
+<div class="section-head"><h3>继续攻克：第二轮扩展主题线索</h3><span id="expanded-summary">读取中</span></div>
+<p class="muted">扩展词组辅助标注，仅展示待确认候选；默认保留所有原始记录、既有审批和失效视频信息。</p>
+<div class="work-controls"><select id="expanded-state"><option value="expanded_title_hint">标题新增候选</option><option value="invalid_description_hint">失效视频简介候选</option><option value="ambiguous_or_insufficient">仍有歧义</option><option value="insufficient_evidence">证据缺失</option><option value="all">全部</option></select></div>
+<div id="expanded-list"></div>
+<div class="pagination"><span id="expanded-page"></span><button id="expanded-prev" type="button" class="outlined">上一页</button><button id="expanded-next" type="button" class="outlined">下一页</button></div>
+<div id="expanded-message" class="muted" aria-live="polite"></div>
+</section>
 <section class="panel" id="full-local-review">
 <div class="section-head"><h3>全量本地复核 · 含失效视频</h3><button id="full-review-refresh" type="button" class="outlined">重新复核现有元数据</button></div>
 <p class="muted">逐条处理剩余800条及100条失效视频。有简介但没标题的失效视频也尝试提取主题，但不虚构标题。</p>
@@ -86,4 +94,4 @@
 <div class="pagination"><span id="review-total"></span><button id="prev" type="button" class="outlined">上一页</button><button id="next" type="button" class="outlined">下一页</button></div></section>
 <section class="panel"><div class="section-head"><h3>收藏夹扫描覆盖率</h3><span id="coverage-label"></span></div><div id="folders"></div></section>
 <footer>仅本地读写分类复核记录 · 不会请求 B站账号写入接口 · 用户数据不上传 GitHub · <span id="updated">尚未更新</span></footer>
-</main></div><script src="/app.js" defer></script><script src="/local-library.js" defer></script><script src="/progress-report.js" defer></script><script src="/evidence-review.js" defer></script><script src="/full-review.js" defer></script></body></html>
+</main></div><script src="/app.js" defer></script><script src="/local-library.js" defer></script><script src="/progress-report.js" defer></script><script src="/evidence-review.js" defer></script><script src="/full-review.js" defer></script><script src="/expanded-triage.js" defer></script></body></html>
