@@ -33,6 +33,17 @@
 <div class="track"><div id="executor-progress" class="fill" style="width:0%"></div></div>
 <div id="executor-states" class="muted"></div>
 </section>
+<section class="panel" id="local-library">
+<div class="section-head"><h3>本地分类知识库 · 19 个主题</h3><span id="library-stats">读取中</span></div>
+<p class="muted">已保存的全部视频按唯一 BV 整理；保留原收藏夹归属。无法确认类别的条目保留待复核，不擅自移动或删除。</p>
+<div class="work-controls"><select id="library-category"><option value="">全部主题</option></select>
+<select id="library-state"><option value="">所有处理状态</option><option value="proposed">分类建议</option><option value="approved">人工确认</option><option value="review_required">待复核</option><option value="invalid">失效</option></select>
+<input type="search" id="library-search" placeholder="搜索标题 / BV" aria-label="本地知识库搜索">
+<button id="library-refresh" type="button" class="outlined">重新生成本地目录</button></div>
+<div id="library-items"></div>
+<div class="pagination"><span id="library-page-stats"></span><button type="button" id="library-prev" class="outlined">上一页</button><button type="button" id="library-next" class="outlined">下一页</button></div>
+<div id="library-message" class="muted" aria-live="polite"></div>
+</section>
 <section class="panel"><div class="section-head"><h3>离线整理与复核</h3><button id="export-plan" type="button" class="outlined">导出待核实同步清单</button></div>
 <p class="muted">这里的分类确认仅保存到本机，不会自动写入 B站。跨类别冲突优先复核。</p><div id="local-review-stats" class="muted"></div>
 <div class="work-controls">
@@ -53,4 +64,4 @@
 <div class="pagination"><span id="review-total"></span><button id="prev" type="button" class="outlined">上一页</button><button id="next" type="button" class="outlined">下一页</button></div></section>
 <section class="panel"><div class="section-head"><h3>收藏夹扫描覆盖率</h3><span id="coverage-label"></span></div><div id="folders"></div></section>
 <footer>仅本地读写分类复核记录 · 不会请求 B站账号写入接口 · 用户数据不上传 GitHub · <span id="updated">尚未更新</span></footer>
-</main></div><script src="/app.js" defer></script></body></html>
+</main></div><script src="/app.js" defer></script><script src="/local-library.js" defer></script></body></html>

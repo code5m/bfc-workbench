@@ -7,6 +7,7 @@ import {fileURLToPath} from 'node:url';
 import {deriveWorkflow,pageVideos,validTopic,TARGETS} from './lib/workflow.mjs';
 import {assessCompletion} from './lib/completion.mjs';
 import {auditStrategy} from './lib/strategy-audit.mjs';
+import {buildLocalCatalogFromDir,saveLocalCatalog} from './lib/local-catalog.mjs';
 import {UnifiedExecutor} from './lib/unified-executor.mjs';
 
 const root=dirname(fileURLToPath(import.meta.url));
@@ -62,8 +63,8 @@ async function getWorkflow(){
  return deriveWorkflow({inventory:src.inventory,classification:src.classification,
   description:src.desc,overrides:src.overrides,guard:src.guard,copySummary:src.copy});
 }
-const mime={'/':'text/html; charset=utf-8','/app.js':'application/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8'};
-const assets={'/':'index.html','/app.js':'app.js','/style.css':'style.css'};
+const mime={'/':'text/html; charset=utf-8','/app.js':'application/javascript; charset=utf-8','/local-library.js':'application/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8'};
+const assets={'/':'index.html','/app.js':'app.js','/local-library.js':'local-library.js','/style.css':'style.css'};
 function sendJson(res,code,obj,extra={}){
  res.writeHead(code,{'Content-Type':'application/json; charset=utf-8',...extra});res.end(JSON.stringify(obj));
 }
@@ -160,6 +161,25 @@ export function createApp(){
    if(req.method==='GET'&&route==='/api/status'){sendJson(res,200,await snapshot());return;}
    if(req.method==='GET'&&route==='/api/completion'){sendJson(res,200,(await snapshot()).completion);return;}
    if(req.method==='GET'&&route==='/api/strategy-audit'){sendJson(res,200,(await snapshot()).strategyAudit);return;}
+   if(req.method==='GET'&&route==='/api/local-catalog'){
+    const c=await buildLocalCatalogFromDir(dataDir);
+    sendJson(res,200,{totals:c.totals,categories:c.categories,unobserved:c.unobserved,folders:c.folders});return;
+   }
+   if(req.method==='GET'&&route==='/api/local-catalog/items'){
+    const c=await buildLocalCatalogFromDir(dataDir);
+    const category=url.searchParams.get('category')||'';
+    const state=url.searchParams.get('state')||'';
+    const page=Math.max(1,Math.min(1000,parseInt(url.searchParams.get('page')||'1',10)||1));
+    const query=(url.searchParams.get('q')||'').toLocaleLowerCase('zh-CN').slice(0,90);
+    const rows=c.records.filter(v=>(!category||v.topic===category)&&(!state||v.localReviewState===state)&&(!query||v.title.toLocaleLowerCase('zh-CN').includes(query)||v.bvid.toLowerCase().includes(query)));
+    sendJson(res,200,{total:rows.length,page,items:rows.slice((page-1)*25,page*25)});return;
+   }
+   if(req.method==='POST'&&route==='/api/local-catalog/rebuild'){
+    if(!reviewAuth(req)){sendJson(res,403,{error:'csrf_or_origin_mismatch'});return;}
+    const c=await buildLocalCatalogFromDir(dataDir);
+    const file=await saveLocalCatalog(dataDir,c);
+    sendJson(res,200,{ok:true,totals:c.totals,localOnly:true});return;
+   }
    if(req.method==='GET'&&route==='/api/review/export'){sendJson(res,200,await exportReview(),{'Content-Disposition':'attachment; filename="bilibili-local-reviews.json"'});return;}
    if(req.method==='GET'&&route==='/api/audit'){sendJson(res,200,await auditOverview());return;}
    if(req.method==='GET'&&route==='/api/executor'){sendJson(res,200,await executor.status());return;}
