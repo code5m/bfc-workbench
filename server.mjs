@@ -9,6 +9,7 @@ import {assessCompletion} from './lib/completion.mjs';
 import {auditStrategy} from './lib/strategy-audit.mjs';
 import {buildLocalCatalogFromDir,saveLocalCatalog} from './lib/local-catalog.mjs';
 import {updateProgress} from './lib/progress-report.mjs';
+import {prepareEvidence,currentEvidence} from './lib/evidence-service.mjs';
 import {UnifiedExecutor} from './lib/unified-executor.mjs';
 
 const root=dirname(fileURLToPath(import.meta.url));
@@ -64,8 +65,8 @@ async function getWorkflow(){
  return deriveWorkflow({inventory:src.inventory,classification:src.classification,
   description:src.desc,overrides:src.overrides,guard:src.guard,copySummary:src.copy});
 }
-const mime={'/':'text/html; charset=utf-8','/app.js':'application/javascript; charset=utf-8','/local-library.js':'application/javascript; charset=utf-8','/progress-report.js':'application/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8'};
-const assets={'/':'index.html','/app.js':'app.js','/local-library.js':'local-library.js','/progress-report.js':'progress-report.js','/style.css':'style.css'};
+const mime={'/':'text/html; charset=utf-8','/app.js':'application/javascript; charset=utf-8','/local-library.js':'application/javascript; charset=utf-8','/progress-report.js':'application/javascript; charset=utf-8','/evidence-review.js':'application/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8'};
+const assets={'/':'index.html','/app.js':'app.js','/local-library.js':'local-library.js','/progress-report.js':'progress-report.js','/evidence-review.js':'evidence-review.js','/style.css':'style.css'};
 function sendJson(res,code,obj,extra={}){
  res.writeHead(code,{'Content-Type':'application/json; charset=utf-8',...extra});res.end(JSON.stringify(obj));
 }
@@ -162,6 +163,14 @@ export function createApp(){
    if(req.method==='GET'&&route==='/api/status'){sendJson(res,200,await snapshot());return;}
    if(req.method==='GET'&&route==='/api/completion'){sendJson(res,200,(await snapshot()).completion);return;}
    if(req.method==='GET'&&route==='/api/strategy-audit'){sendJson(res,200,(await snapshot()).strategyAudit);return;}
+   if(req.method==='GET'&&route==='/api/evidence'){const e=await currentEvidence(dataDir);sendJson(res,200,e?{ready:true,summary:e.summary,generatedAt:e.generatedAt}:{ready:false});return;}
+   if(req.method==='GET'&&route==='/api/evidence/items'){const e=await currentEvidence(dataDir);if(!e){sendJson(res,404,{error:'evidence_not_prepared'});return;}
+    const state=url.searchParams.get('state')||'title_specific_proposal';
+    const page=Math.max(1,Math.min(1000,Number(url.searchParams.get('page')||1)||1));
+    const rows=e.proposals.filter(x=>state==='all'||x.status===state);
+    sendJson(res,200,{total:rows.length,page,items:rows.slice((page-1)*30,page*30)});return;}
+   if(req.method==='POST'&&route==='/api/evidence/rebuild'){if(!reviewAuth(req)){sendJson(res,403,{error:'csrf_or_origin_mismatch'});return;}
+    const e=await prepareEvidence(dataDir);sendJson(res,200,{ok:true,summary:e.summary,remoteRequests:0});return;}
    if(req.method==='GET'&&route==='/api/progress-report'){sendJson(res,200,await updateProgress(dataDir));return;}
    if(req.method==='GET'&&route==='/api/local-catalog'){
     const c=await buildLocalCatalogFromDir(dataDir);

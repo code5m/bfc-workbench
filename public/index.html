@@ -33,6 +33,14 @@
 <div class="track"><div id="executor-progress" class="fill" style="width:0%"></div></div>
 <div id="executor-states" class="muted"></div>
 </section>
+<section class="panel" id="evidence-panel">
+<div class="section-head"><h3>本轮新增：标题与简介分类证据</h3><button id="evidence-refresh" type="button" class="outlined">重新检查本地线索</button></div>
+<p class="muted">机器建议不是人工确认，不会自动修改B站账号。默认夹优先，主题冲突保留待复核。</p>
+<div id="evidence-summary" class="muted">正在读取本地线索…</div>
+<div id="evidence-list"></div>
+<div class="pagination"><span id="evidence-total"></span><button id="evidence-prev" type="button" class="outlined">上一页</button><button id="evidence-next" type="button" class="outlined">下一页</button></div>
+<div id="evidence-message" class="muted" aria-live="polite"></div>
+</section>
 <section class="panel" id="progress-report">
 <div class="section-head"><h3>每轮进度与剩余任务报告</h3><button type="button" class="outlined" id="progress-refresh">刷新本地报告</button></div>
 <p class="muted">本地自动对账：仅在状态实质变化时追加历史记录。所有进度不代表 B站账号已同步。</p>
@@ -71,4 +79,4 @@
 <div class="pagination"><span id="review-total"></span><button id="prev" type="button" class="outlined">上一页</button><button id="next" type="button" class="outlined">下一页</button></div></section>
 <section class="panel"><div class="section-head"><h3>收藏夹扫描覆盖率</h3><span id="coverage-label"></span></div><div id="folders"></div></section>
 <footer>仅本地读写分类复核记录 · 不会请求 B站账号写入接口 · 用户数据不上传 GitHub · <span id="updated">尚未更新</span></footer>
-</main></div><script src="/app.js" defer></script><script src="/local-library.js" defer></script><script src="/progress-report.js" defer></script></body></html>
+</main></div><script src="/app.js" defer></script><script src="/local-library.js" defer></script><script src="/progress-report.js" defer></script><script src="/evidence-review.js" defer></script></body></html>
