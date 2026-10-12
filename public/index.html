@@ -17,6 +17,22 @@
   <p class="completion-note">全部门禁真实通过前，状态永远是“未完成”。 <a href="https://github.com/code5m/bilibili-favorites-workbench/blob/main/docs/COMPLETION_CONTRACT.md" target="_blank" rel="noopener noreferrer">查看正式交付契约 ↗</a></p>
 </section>
 <div class="columns"><section class="panel"><div class="section-head"><h3>主题分布</h3><span>按唯一 BV 统计</span></div><div id="topics"></div></section><section class="panel"><div class="section-head"><h3>完成路线</h3><span>真实执行状态</span></div><div id="actions"></div></section></div>
+<section class="panel" id="executor-panel">
+<div class="section-head"><h3>统一执行器 · 离线任务中心</h3><span id="executor-phase" class="completion-state unmet">未准备</span></div>
+<p class="muted">一个入口执行全部本地分类任务：P0 默认夹优先、BV 去重、断点保存、暂停恢复、取消、审计。当前不连接 B站、不修改账号。</p>
+<div class="work-controls">
+<button type="button" id="exec-prepare" class="outlined">生成统一任务</button>
+<button type="button" id="exec-start" class="outlined">开始本地执行</button>
+<button type="button" id="exec-pause" class="outlined">暂停</button>
+<button type="button" id="exec-resume" class="outlined">恢复</button>
+<button type="button" id="exec-cancel" class="outlined">取消</button>
+<button type="button" id="exec-refresh" class="outlined">查看进度</button>
+</div>
+<div id="executor-message" class="action-help" aria-live="polite"></div>
+<div class="folder-meta"><span id="executor-counter">0 / 0</span><span id="executor-blocked">禁止账号写入</span></div>
+<div class="track"><div id="executor-progress" class="fill" style="width:0%"></div></div>
+<div id="executor-states" class="muted"></div>
+</section>
 <section class="panel"><div class="section-head"><h3>离线整理与复核</h3><button id="export-plan" type="button" class="outlined">导出待核实同步清单</button></div>
 <p class="muted">这里的分类确认仅保存到本机，不会自动写入 B站。跨类别冲突优先复核。</p><div id="local-review-stats" class="muted"></div>
 <div class="work-controls">
