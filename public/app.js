@@ -66,7 +66,7 @@ function drawStatus(d){
 async function refresh(){
  try{
   const r=await fetch('/api/status',{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);
-  drawStatus(await r.json());
+  const payload=await r.json();drawStatus(payload);if(payload.executor)drawExecutor(payload.executor);
  }catch(e){$('headline').textContent='本地状态读取失败';$('subhead').textContent=String(e);}
 }
 async function readVideos(){
@@ -163,3 +163,45 @@ async function wireControls(){
  $('cleanup-help').onclick=()=>help('cleanup');
 }
 refresh();bootstrap().then(wireControls);setInterval(refresh,30000);
+
+
+function drawExecutor(status){
+ if(!status)return;
+ const phase=status.phase||'not_prepared';
+ $('executor-phase').textContent=phase==='not_prepared'?'未准备':phase.startsWith('offline_complete')?'离线任务已完成':phase==='paused'?'已暂停':phase==='cancelled'?'已取消':phase==='offline_running'?'本地执行中':'待执行';
+ $('executor-phase').className='completion-state '+(phase.startsWith('offline_complete')?'passed':'unmet');
+ $('executor-counter').textContent=(status.cursor||0)+' / '+(status.total||0)+' 项已检查';
+ $('executor-blocked').textContent=status.blocked?'HTTP 412 已保护 · 账号操作锁定':'仅离线 · 无账号适配器';
+ const pct=status.total?Math.round(status.cursor/status.total*100):0;
+ $('executor-progress').style.width=pct+'%';
+ $('executor-states').textContent=Object.entries(status.statuses||{}).map(([state,count])=>state+': '+count).join(' · ');
+ for(const action of ['prepare','start','pause','resume','cancel']){
+  const btn=$('exec-'+action);if(!btn)continue;
+  btn.disabled=(action==='start'&&!['prepared_offline','offline_running'].includes(phase))
+   ||(action==='resume'&&phase!=='paused')
+   ||(action==='pause'&&!['offline_running','prepared_offline'].includes(phase))
+   ||(action==='cancel'&&(phase==='not_prepared'||phase==='cancelled'||phase.startsWith('offline_complete')));
+ }
+}
+async function loadExecutor(){
+ try{const r=await fetch('/api/executor',{cache:'no-store'});if(!r.ok)throw Error('status '+r.status);drawExecutor(await r.json());}
+ catch(e){$('executor-message').textContent='执行器读取失败：'+String(e);}
+}
+async function runExecutorAction(action){
+ try{
+  if(!session?.token)throw Error('本地会话尚未建立');
+  const r=await fetch('/api/executor/action',{method:'POST',headers:{'Content-Type':'application/json','X-Local-CSRF':session.token},body:JSON.stringify({action})});
+  const data=await r.json();if(!r.ok)throw Error(data.error||'操作失败');
+  drawExecutor(data);
+  $('executor-message').textContent='已执行 '+({prepare:'生成任务',start:'开始离线执行',pause:'暂停',resume:'恢复',cancel:'取消'}[action])+'；只处理本地数据';
+ }catch(e){$('executor-message').textContent=String(e);}
+}
+async function wireExecutor(){
+ for(const action of ['prepare','start','pause','resume','cancel']){
+  $('exec-'+action).onclick=()=>runExecutorAction(action);
+ }
+ $('exec-refresh').onclick=loadExecutor;
+ await loadExecutor();
+}
+wireExecutor();
+setInterval(loadExecutor,3000);
