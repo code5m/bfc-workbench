@@ -7,11 +7,13 @@ import {fileURLToPath} from 'node:url';
 import {deriveWorkflow,pageVideos,validTopic,TARGETS} from './lib/workflow.mjs';
 import {assessCompletion} from './lib/completion.mjs';
 import {auditStrategy} from './lib/strategy-audit.mjs';
+import {UnifiedExecutor} from './lib/unified-executor.mjs';
 
 const root=dirname(fileURLToPath(import.meta.url));
 const dataDir=process.env.BILIBILI_FAVORITES_DATA_DIR || join(homedir(),'Documents','Bilibili-Favorites-Review');
 const host='127.0.0.1',port=Number(process.env.PORT||4198);
 const csrf=randomBytes(32).toString('hex');
+const executor=new UnifiedExecutor({dataDir,batchSize:40});
 const readJson=async(name)=>{try{return JSON.parse(await readFile(join(dataDir,name),'utf8'));}catch{return null;}};
 
 export function summarize({inventory,classification,guard,copy,desc}={}){
@@ -52,6 +54,7 @@ export async function snapshot(){
  summary.workflow={stats:workflow.stats,milestones:workflow.milestones};
  summary.completion=assessCompletion({inventory:src.inventory,workflow,guard:src.guard,finalEvidence:src.finalEvidence});
  summary.strategyAudit=auditStrategy({inventory:src.inventory,guard:src.guard,classification:src.classification});
+ summary.executor=await executor.status();
  return summary;
 }
 async function getWorkflow(){
@@ -159,6 +162,23 @@ export function createApp(){
    if(req.method==='GET'&&route==='/api/strategy-audit'){sendJson(res,200,(await snapshot()).strategyAudit);return;}
    if(req.method==='GET'&&route==='/api/review/export'){sendJson(res,200,await exportReview(),{'Content-Disposition':'attachment; filename="bilibili-local-reviews.json"'});return;}
    if(req.method==='GET'&&route==='/api/audit'){sendJson(res,200,await auditOverview());return;}
+   if(req.method==='GET'&&route==='/api/executor'){sendJson(res,200,await executor.status());return;}
+   if(req.method==='POST'&&route==='/api/executor/action'){
+    if(!reviewAuth(req)){sendJson(res,403,{error:'csrf_or_origin_mismatch'});return;}
+    try{
+     const request=await loadSmallBody(req);let result;
+     switch(request?.action){
+      case 'prepare': result=await executor.prepare(await getWorkflow());break;
+      case 'start': result=await executor.start();break;
+      case 'pause': result=await executor.pause();break;
+      case 'resume': result=await executor.resume();break;
+      case 'cancel': result=await executor.cancel();break;
+      default:sendJson(res,400,{error:'unknown_executor_action'});return;
+     }
+     sendJson(res,200,result);
+    }catch(e){sendJson(res,409,{error:String(e.message).slice(0,160)});}
+    return;
+   }
    if(req.method==='GET'&&route==='/api/health'){sendJson(res,200,{ok:true,localOnly:true,bilibiliNetworkRequests:0});return;}
    if(req.method==='POST'&&route==='/api/review/restore'){
     if(!reviewAuth(req)){sendJson(res,403,{error:'csrf_or_origin_mismatch'});return;}
