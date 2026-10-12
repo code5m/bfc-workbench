@@ -33,6 +33,13 @@
 <div class="track"><div id="executor-progress" class="fill" style="width:0%"></div></div>
 <div id="executor-states" class="muted"></div>
 </section>
+<section class="panel" id="full-local-review">
+<div class="section-head"><h3>全量本地复核 · 含失效视频</h3><button id="full-review-refresh" type="button" class="outlined">重新复核现有元数据</button></div>
+<p class="muted">逐条处理剩余800条及100条失效视频。有简介但没标题的失效视频也尝试提取主题，但不虚构标题。</p>
+<div id="full-review-stats" class="muted">读取中</div>
+<div class="work-controls"><select id="full-review-state"><option value="all">全部复核结果</option><option value="title_supported_suggestion">标题明确建议</option><option value="intro_supported_suggestion">简介主题建议</option><option value="invalid_intro_topic_hint">失效视频有主题线索</option><option value="insufficient_metadata">证据不足</option><option value="multi_topic_review">多个主题冲突</option><option value="invalid_no_usable_metadata">失效且无有效元数据</option><option value="invalid_intro_needs_review">失效简介无法判断</option></select><label><input id="full-review-invalid" type="checkbox">仅失效视频</label></div>
+<div id="full-review-list"></div><div class="pagination"><span id="full-review-count"></span><button id="full-review-prev" type="button" class="outlined">上一页</button><button id="full-review-next" type="button" class="outlined">下一页</button></div><div id="full-review-message" class="muted"></div>
+</section>
 <section class="panel" id="evidence-panel">
 <div class="section-head"><h3>本轮新增：标题与简介分类证据</h3><button id="evidence-refresh" type="button" class="outlined">重新检查本地线索</button></div>
 <p class="muted">机器建议不是人工确认，不会自动修改B站账号。默认夹优先，主题冲突保留待复核。</p>
@@ -79,4 +86,4 @@
 <div class="pagination"><span id="review-total"></span><button id="prev" type="button" class="outlined">上一页</button><button id="next" type="button" class="outlined">下一页</button></div></section>
 <section class="panel"><div class="section-head"><h3>收藏夹扫描覆盖率</h3><span id="coverage-label"></span></div><div id="folders"></div></section>
 <footer>仅本地读写分类复核记录 · 不会请求 B站账号写入接口 · 用户数据不上传 GitHub · <span id="updated">尚未更新</span></footer>
-</main></div><script src="/app.js" defer></script><script src="/local-library.js" defer></script><script src="/progress-report.js" defer></script><script src="/evidence-review.js" defer></script></body></html>
+</main></div><script src="/app.js" defer></script><script src="/local-library.js" defer></script><script src="/progress-report.js" defer></script><script src="/evidence-review.js" defer></script><script src="/full-review.js" defer></script></body></html>

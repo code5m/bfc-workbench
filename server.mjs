@@ -11,6 +11,7 @@ import {buildLocalCatalogFromDir,saveLocalCatalog} from './lib/local-catalog.mjs
 import {updateProgress} from './lib/progress-report.mjs';
 import {prepareEvidence,currentEvidence} from './lib/evidence-service.mjs';
 import {UnifiedExecutor} from './lib/unified-executor.mjs';
+import {reviewFromDir,saveDeepReview} from './lib/complete-local-review.mjs';
 
 const root=dirname(fileURLToPath(import.meta.url));
 const dataDir=process.env.BILIBILI_FAVORITES_DATA_DIR || join(homedir(),'Documents','Bilibili-Favorites-Review');
@@ -65,8 +66,8 @@ async function getWorkflow(){
  return deriveWorkflow({inventory:src.inventory,classification:src.classification,
   description:src.desc,overrides:src.overrides,assistant:src.assistant,guard:src.guard,copySummary:src.copy});
 }
-const mime={'/':'text/html; charset=utf-8','/app.js':'application/javascript; charset=utf-8','/local-library.js':'application/javascript; charset=utf-8','/progress-report.js':'application/javascript; charset=utf-8','/evidence-review.js':'application/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8'};
-const assets={'/':'index.html','/app.js':'app.js','/local-library.js':'local-library.js','/progress-report.js':'progress-report.js','/evidence-review.js':'evidence-review.js','/style.css':'style.css'};
+const mime={'/':'text/html; charset=utf-8','/app.js':'application/javascript; charset=utf-8','/local-library.js':'application/javascript; charset=utf-8','/progress-report.js':'application/javascript; charset=utf-8','/evidence-review.js':'application/javascript; charset=utf-8','/full-review.js':'application/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8'};
+const assets={'/':'index.html','/app.js':'app.js','/local-library.js':'local-library.js','/progress-report.js':'progress-report.js','/evidence-review.js':'evidence-review.js','/full-review.js':'full-review.js','/style.css':'style.css'};
 function sendJson(res,code,obj,extra={}){
  res.writeHead(code,{'Content-Type':'application/json; charset=utf-8',...extra});res.end(JSON.stringify(obj));
 }
@@ -163,6 +164,22 @@ export function createApp(){
    if(req.method==='GET'&&route==='/api/status'){sendJson(res,200,await snapshot());return;}
    if(req.method==='GET'&&route==='/api/completion'){sendJson(res,200,(await snapshot()).completion);return;}
    if(req.method==='GET'&&route==='/api/strategy-audit'){sendJson(res,200,(await snapshot()).strategyAudit);return;}
+   if(req.method==='GET'&&route==='/api/complete-local-review'){
+    const result=await readJson('complete-local-review.json');
+    sendJson(res,200,result?{ready:true,stats:result.stats,createdAt:result.createdAt}:{ready:false});return;
+   }
+   if(req.method==='GET'&&route==='/api/complete-local-review/items'){
+    const r=await readJson('complete-local-review.json');if(!r){sendJson(res,404,{error:'review_missing'});return;}
+    const state=url.searchParams.get('state')||'all';const invalid=url.searchParams.get('invalid')==='1';
+    const page=Math.max(1,Math.min(1000,parseInt(url.searchParams.get('page')||'1',10)||1));
+    const items=r.rows.filter(v=>(state==='all'||v.status===state)&&(!invalid||v.originalDecision==='invalid'));
+    sendJson(res,200,{page,total:items.length,items:items.slice((page-1)*30,page*30)});return;
+   }
+   if(req.method==='POST'&&route==='/api/complete-local-review/rebuild'){
+    if(!reviewAuth(req)){sendJson(res,403,{error:'csrf_or_origin_mismatch'});return;}
+    const r=await reviewFromDir(dataDir);await saveDeepReview(dataDir,r);
+    sendJson(res,200,{ok:true,stats:r.stats,accountWrites:0});return;
+   }
    if(req.method==='GET'&&route==='/api/evidence'){const e=await currentEvidence(dataDir);sendJson(res,200,e?{ready:true,summary:e.summary,generatedAt:e.generatedAt}:{ready:false});return;}
    if(req.method==='GET'&&route==='/api/evidence/items'){const e=await currentEvidence(dataDir);if(!e){sendJson(res,404,{error:'evidence_not_prepared'});return;}
     const state=url.searchParams.get('state')||'title_specific_proposal';
