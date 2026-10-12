@@ -1,8 +1,9 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>B站收藏夹整理工作台</title><link rel="stylesheet" href="/style.css"></head><body><div id="app">
 <header><div class="eyebrow">PERSONAL KNOWLEDGE SYSTEM · 本地优先</div><h1>B站收藏夹整理工作台</h1><p>收藏资产、整理复核和账号同步的可核验进度。</p><span id="access" class="pill">读取本地状态中...</span></header>
-<main><section class="hero"><div><div class="eyebrow">当前运行状态</div><h2 id="headline">正在读取本地快照</h2><p id="subhead">不访问 B站接口，不改变原有收藏。</p></div><div class="round" id="coverage">—</div></section>
-<div class="stats"><article><span>已保存收藏关系</span><strong id="memberships">—</strong><small>离线快照，不等于账号全量</small></article><article><span>不同视频 BV 号</span><strong id="unique">—</strong><small>跨收藏夹去重统计</small></article><article><span>视频分类建议</span><strong id="classified">—</strong><small>唯一 BV 口径，未全部审核</small></article><article><span>首轮成功复制</span><strong id="copied">—</strong><small>第二轮尚未完成</small></article></div>
-<section class="panel completion-panel" id="completion-panel">
+<nav class="primary-nav" aria-label="工作台主导航"><a href="#overview" data-view-link="overview">总览</a><a href="#classification" data-view-link="classification">分类管理</a><a href="#sync" data-view-link="sync">同步管理</a></nav>
+<main><section class="hero" data-view="overview"><div><div class="eyebrow">当前运行状态</div><h2 id="headline">正在读取本地快照</h2><p id="subhead">不访问 B站接口，不改变原有收藏。</p></div><div class="round" id="coverage">—</div></section>
+<div class="stats" data-view="overview"><article><span>已保存收藏关系</span><strong id="memberships">—</strong><small>离线快照，不等于账号全量</small></article><article><span>不同视频 BV 号</span><strong id="unique">—</strong><small>跨收藏夹去重统计</small></article><article><span>视频分类建议</span><strong id="classified">—</strong><small>唯一 BV 口径，未全部审核</small></article><article><span>首轮成功复制</span><strong id="copied">—</strong><small>第二轮尚未完成</small></article></div>
+<section class="panel completion-panel" id="completion-panel" data-view="overview">
   <div class="section-head"><h3><span class="p0-marker">P0</span> 最终交付目标：默认收藏夹全部整理完成</h3><span id="completion-status" class="completion-state">核验中</span></div>
   <p class="completion-mission">验收不是“本地分类完成”，而是每个有效视频真正进入 B站正确分类夹、成功回读，并安全清理默认夹中的原始收藏关系。严禁漏项或误删。</p>
   <div class="delivery-stats">
@@ -16,8 +17,8 @@
   <div id="completion-gates"></div>
   <p class="completion-note">全部门禁真实通过前，状态永远是“未完成”。 <a href="https://github.com/code5m/bilibili-favorites-workbench/blob/main/docs/COMPLETION_CONTRACT.md" target="_blank" rel="noopener noreferrer">查看正式交付契约 ↗</a></p>
 </section>
-<div class="columns"><section class="panel"><div class="section-head"><h3>主题分布</h3><span>按唯一 BV 统计</span></div><div id="topics"></div></section><section class="panel"><div class="section-head"><h3>完成路线</h3><span>真实执行状态</span></div><div id="actions"></div></section></div>
-<section class="panel" id="executor-panel">
+<div class="columns" data-view="overview"><section class="panel"><div class="section-head"><h3>主题分布</h3><span>按唯一 BV 统计</span></div><div id="topics"></div></section><section class="panel"><div class="section-head"><h3>完成路线</h3><span>真实执行状态</span></div><div id="actions"></div></section></div>
+<section class="panel" id="executor-panel" data-view="sync">
 <div class="section-head"><h3>统一执行器 · 离线任务中心</h3><span id="executor-phase" class="completion-state unmet">未准备</span></div>
 <p class="muted">一个入口执行全部本地分类任务：P0 默认夹优先、BV 去重、断点保存、暂停恢复、取消、审计。当前不连接 B站、不修改账号。</p>
 <div class="work-controls">
@@ -33,7 +34,7 @@
 <div class="track"><div id="executor-progress" class="fill" style="width:0%"></div></div>
 <div id="executor-states" class="muted"></div>
 </section>
-<section class="panel" id="expanded-local-review">
+<section class="panel" id="expanded-local-review" data-view="classification">
 <div class="section-head"><h3>继续攻克：第二轮扩展主题线索</h3><span id="expanded-summary">读取中</span></div>
 <p class="muted">扩展词组辅助标注，仅展示待确认候选；默认保留所有原始记录、既有审批和失效视频信息。</p>
 <div class="work-controls"><select id="expanded-state"><option value="expanded_title_hint">标题新增候选</option><option value="invalid_description_hint">失效视频简介候选</option><option value="ambiguous_or_insufficient">仍有歧义</option><option value="insufficient_evidence">证据缺失</option><option value="all">全部</option></select></div>
@@ -41,14 +42,14 @@
 <div class="pagination"><span id="expanded-page"></span><button id="expanded-prev" type="button" class="outlined">上一页</button><button id="expanded-next" type="button" class="outlined">下一页</button></div>
 <div id="expanded-message" class="muted" aria-live="polite"></div>
 </section>
-<section class="panel" id="full-local-review">
+<section class="panel" id="full-local-review" data-view="classification">
 <div class="section-head"><h3>全量本地复核 · 含失效视频</h3><button id="full-review-refresh" type="button" class="outlined">重新复核现有元数据</button></div>
 <p class="muted">逐条处理剩余800条及100条失效视频。有简介但没标题的失效视频也尝试提取主题，但不虚构标题。</p>
 <div id="full-review-stats" class="muted">读取中</div>
 <div class="work-controls"><select id="full-review-state"><option value="all">全部复核结果</option><option value="title_supported_suggestion">标题明确建议</option><option value="intro_supported_suggestion">简介主题建议</option><option value="invalid_intro_topic_hint">失效视频有主题线索</option><option value="insufficient_metadata">证据不足</option><option value="multi_topic_review">多个主题冲突</option><option value="invalid_no_usable_metadata">失效且无有效元数据</option><option value="invalid_intro_needs_review">失效简介无法判断</option></select><label><input id="full-review-invalid" type="checkbox">仅失效视频</label></div>
 <div id="full-review-list"></div><div class="pagination"><span id="full-review-count"></span><button id="full-review-prev" type="button" class="outlined">上一页</button><button id="full-review-next" type="button" class="outlined">下一页</button></div><div id="full-review-message" class="muted"></div>
 </section>
-<section class="panel" id="evidence-panel">
+<section class="panel" id="evidence-panel" data-view="classification">
 <div class="section-head"><h3>本轮新增：标题与简介分类证据</h3><button id="evidence-refresh" type="button" class="outlined">重新检查本地线索</button></div>
 <p class="muted">机器建议不是人工确认，不会自动修改B站账号。默认夹优先，主题冲突保留待复核。</p>
 <div id="evidence-summary" class="muted">正在读取本地线索…</div>
@@ -56,25 +57,25 @@
 <div class="pagination"><span id="evidence-total"></span><button id="evidence-prev" type="button" class="outlined">上一页</button><button id="evidence-next" type="button" class="outlined">下一页</button></div>
 <div id="evidence-message" class="muted" aria-live="polite"></div>
 </section>
-<section class="panel" id="progress-report">
+<section class="panel" id="progress-report" data-view="overview">
 <div class="section-head"><h3>每轮进度与剩余任务报告</h3><button type="button" class="outlined" id="progress-refresh">刷新本地报告</button></div>
 <p class="muted">本地自动对账：仅在状态实质变化时追加历史记录。所有进度不代表 B站账号已同步。</p>
 <div id="progress-current" class="delivery-stats"></div>
 <div id="progress-diff" class="muted"></div>
 <div id="progress-waiting" class="muted"></div>
 </section>
-<section class="panel" id="local-library">
-<div class="section-head"><h3>本地分类知识库 · 19 个主题</h3><span id="library-stats">读取中</span></div>
+<section class="panel" id="local-library" data-view="classification">
+<div class="section-head"><h3>分类管理 · 本地知识库</h3><span id="library-stats">读取中</span></div>
 <p class="muted">已保存的全部视频按唯一 BV 整理；保留原收藏夹归属。无法确认类别的条目保留待复核，不擅自移动或删除。</p>
-<div class="work-controls"><select id="library-category"><option value="">全部主题</option></select>
+<div class="library-layout"><aside class="library-sidebar" aria-label="分类目录"><h4>主题分类</h4><div id="library-topic-nav">加载分类中…</div></aside><div class="library-content"><div class="work-controls"><select id="library-category"><option value="">全部主题</option></select>
 <select id="library-state"><option value="">所有处理状态</option><option value="proposed">分类建议</option><option value="approved">人工确认</option><option value="assisted">AI辅助复核（待人工确认）</option><option value="review_required">待复核</option><option value="invalid">失效</option></select>
 <input type="search" id="library-search" placeholder="搜索标题 / BV" aria-label="本地知识库搜索">
 <button id="library-refresh" type="button" class="outlined">重新生成本地目录</button></div>
 <div id="library-items"></div>
 <div class="pagination"><span id="library-page-stats"></span><button type="button" id="library-prev" class="outlined">上一页</button><button type="button" id="library-next" class="outlined">下一页</button></div>
-<div id="library-message" class="muted" aria-live="polite"></div>
+<div id="library-message" class="muted" aria-live="polite"></div></div></div>
 </section>
-<section class="panel"><div class="section-head"><h3>离线整理与复核</h3><button id="export-plan" type="button" class="outlined">导出待核实同步清单</button></div>
+<section class="panel" data-view="classification"><div class="section-head"><h3>离线整理与复核</h3><button id="export-plan" type="button" class="outlined">导出待核实同步清单</button></div>
 <p class="muted">这里的分类确认仅保存到本机，不会自动写入 B站。跨类别冲突优先复核。</p><div id="local-review-stats" class="muted"></div>
 <div class="work-controls">
   <button type="button" id="refresh-all" class="outlined">刷新本地数据</button>
@@ -92,6 +93,6 @@
 <div class="review-filters"><input type="search" id="review-search" placeholder="按视频标题或 BV 号搜索"><select id="review-filter"><option value="review">待复核</option><option value="classified">已有分类建议</option><option value="invalid">失效视频</option><option value="all">全部视频</option></select></div>
 <p id="review-message" class="muted" aria-live="polite"></p><div id="review-items"></div>
 <div class="pagination"><span id="review-total"></span><button id="prev" type="button" class="outlined">上一页</button><button id="next" type="button" class="outlined">下一页</button></div></section>
-<section class="panel"><div class="section-head"><h3>收藏夹扫描覆盖率</h3><span id="coverage-label"></span></div><div id="folders"></div></section>
+<section class="panel" data-view="sync"><div class="section-head"><h3>收藏夹扫描覆盖率</h3><span id="coverage-label"></span></div><div id="folders"></div></section>
 <footer>仅本地读写分类复核记录 · 不会请求 B站账号写入接口 · 用户数据不上传 GitHub · <span id="updated">尚未更新</span></footer>
-</main></div><script src="/app.js" defer></script><script src="/local-library.js" defer></script><script src="/progress-report.js" defer></script><script src="/evidence-review.js" defer></script><script src="/full-review.js" defer></script><script src="/expanded-triage.js" defer></script></body></html>
+</main></div><script src="/app.js" defer></script><script src="/local-library.js" defer></script><script src="/progress-report.js" defer></script><script src="/evidence-review.js" defer></script><script src="/full-review.js" defer></script><script src="/expanded-triage.js" defer></script><script src="/navigation.js" defer></script></body></html>

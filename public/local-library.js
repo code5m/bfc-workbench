@@ -3,11 +3,26 @@ let libraryPage=1,libraryTotal=0;
 async function loadLibraryMeta(){
  const r=await fetch('/api/local-catalog');if(!r.ok)throw Error('本地目录概况不可读取');
  const meta=await r.json();
- $('library-stats').textContent=meta.totals.distinctBvids+' 个视频 · '+meta.categories.length+' 个主题 · '+meta.totals.assistedClassifications+' 已AI复核 · '+meta.totals.needingReview+' 待复核' · '+meta.totals.unobservedFolders+' 个目录待补采';
+ $('library-stats').textContent=meta.totals.distinctBvids+' 个视频 · '+meta.categories.length+' 个主题 · '+meta.totals.assistedClassifications+' 已AI复核 · '+meta.totals.needingReview+' 待复核 · '+meta.totals.unobservedFolders+' 个目录待补采';
  const chooser=$('library-category'),old=chooser.value;chooser.replaceChildren();
  const all=elem(chooser,'option','全部主题');all.value='';
  for(const c of meta.categories){const opt=elem(chooser,'option',c.name+' ('+c.count+')');opt.value=c.name;}
  chooser.value=old;
+ const nav=$('library-topic-nav');
+ nav.replaceChildren();
+ for(const [topic,label,count] of [['','全部主题',meta.totals.distinctBvids],...meta.categories.map(c=>[c.name,c.name,c.count])]){
+  const btn=elem(nav,'button',undefined,'library-topic-button');
+  btn.type='button';btn.setAttribute('aria-pressed',String(chooser.value===topic));
+  elem(btn,'span',label);elem(btn,'span',count,'count');
+  btn.onclick=()=>{chooser.value=topic;libraryPage=1;loadLibrary();refreshTopicSelection();};
+ }
+
+}
+function refreshTopicSelection(){
+ const current=$('library-category').value;
+ for(const btn of $('library-topic-nav').querySelectorAll('button')){
+  btn.setAttribute('aria-pressed',String(btn.querySelector('span')?.textContent===(current||'全部主题')));
+ }
 }
 async function loadLibrary(){
  try{
@@ -28,7 +43,7 @@ async function loadLibrary(){
 }
 async function bootLibrary(){
  try{await loadLibraryMeta();await loadLibrary();}catch(e){$('library-message').textContent=String(e);}
- $('library-category').onchange=()=>{libraryPage=1;loadLibrary();};
+ $('library-category').onchange=()=>{libraryPage=1;loadLibrary();refreshTopicSelection();};
  $('library-state').onchange=()=>{libraryPage=1;loadLibrary();};
  $('library-search').oninput=()=>{libraryPage=1;loadLibrary();};
  $('library-prev').onclick=()=>{libraryPage=Math.max(1,libraryPage-1);loadLibrary();};

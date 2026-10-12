@@ -66,8 +66,8 @@ async function getWorkflow(){
  return deriveWorkflow({inventory:src.inventory,classification:src.classification,
   description:src.desc,overrides:src.overrides,assistant:src.assistant,guard:src.guard,copySummary:src.copy});
 }
-const mime={'/':'text/html; charset=utf-8','/app.js':'application/javascript; charset=utf-8','/local-library.js':'application/javascript; charset=utf-8','/progress-report.js':'application/javascript; charset=utf-8','/evidence-review.js':'application/javascript; charset=utf-8','/full-review.js':'application/javascript; charset=utf-8','/expanded-triage.js':'application/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8'};
-const assets={'/':'index.html','/app.js':'app.js','/local-library.js':'local-library.js','/progress-report.js':'progress-report.js','/evidence-review.js':'evidence-review.js','/full-review.js':'full-review.js','/expanded-triage.js':'expanded-triage.js','/style.css':'style.css'};
+const mime={'/':'text/html; charset=utf-8','/app.js':'application/javascript; charset=utf-8','/local-library.js':'application/javascript; charset=utf-8','/progress-report.js':'application/javascript; charset=utf-8','/evidence-review.js':'application/javascript; charset=utf-8','/full-review.js':'application/javascript; charset=utf-8','/expanded-triage.js':'application/javascript; charset=utf-8','/navigation.js':'application/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8'};
+const assets={'/':'index.html','/app.js':'app.js','/local-library.js':'local-library.js','/progress-report.js':'progress-report.js','/evidence-review.js':'evidence-review.js','/full-review.js':'full-review.js','/expanded-triage.js':'expanded-triage.js','/navigation.js':'navigation.js','/style.css':'style.css'};
 function sendJson(res,code,obj,extra={}){
  res.writeHead(code,{'Content-Type':'application/json; charset=utf-8',...extra});res.end(JSON.stringify(obj));
 }
