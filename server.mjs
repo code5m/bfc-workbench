@@ -41,19 +41,19 @@ export function summarize({inventory,classification,guard,copy,desc}={}){
 }
 
 async function readSources(){
- const [inventory,classification,guard,copy,desc,overrides,finalEvidence]=await Promise.all([
+ const [inventory,classification,guard,copy,desc,overrides,finalEvidence,assistant]=await Promise.all([
   readJson('inventory-rescan-v2.json'),readJson('v3-classification.json'),
   readJson('account-access-guard.json'),readJson('copy-summary.json'),
   readJson('description-review.json'),readJson('manual-review-overrides.json'),
-  readJson('final-acceptance-evidence.json')
+  readJson('final-acceptance-evidence.json'),readJson('local-ai-reviewed-decisions.json')
  ]);
- return {inventory,classification,guard,copy,desc,overrides,finalEvidence};
+ return {inventory,classification,guard,copy,desc,overrides,finalEvidence,assistant};
 }
 export async function snapshot(){
  const src=await readSources();
  const summary=summarize(src);
  const workflow=deriveWorkflow({inventory:src.inventory,classification:src.classification,
-   description:src.desc,overrides:src.overrides,guard:src.guard,copySummary:src.copy});
+   description:src.desc,overrides:src.overrides,assistant:src.assistant,guard:src.guard,copySummary:src.copy});
  summary.workflow={stats:workflow.stats,milestones:workflow.milestones};
  summary.completion=assessCompletion({inventory:src.inventory,workflow,guard:src.guard,finalEvidence:src.finalEvidence});
  summary.strategyAudit=auditStrategy({inventory:src.inventory,guard:src.guard,classification:src.classification});
@@ -63,7 +63,7 @@ export async function snapshot(){
 async function getWorkflow(){
  const src=await readSources();
  return deriveWorkflow({inventory:src.inventory,classification:src.classification,
-  description:src.desc,overrides:src.overrides,guard:src.guard,copySummary:src.copy});
+  description:src.desc,overrides:src.overrides,assistant:src.assistant,guard:src.guard,copySummary:src.copy});
 }
 const mime={'/':'text/html; charset=utf-8','/app.js':'application/javascript; charset=utf-8','/local-library.js':'application/javascript; charset=utf-8','/progress-report.js':'application/javascript; charset=utf-8','/evidence-review.js':'application/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8'};
 const assets={'/':'index.html','/app.js':'app.js','/local-library.js':'local-library.js','/progress-report.js':'progress-report.js','/evidence-review.js':'evidence-review.js','/style.css':'style.css'};
