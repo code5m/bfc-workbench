@@ -1,0 +1,29 @@
+name: Unified Executor Validation
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax and unit tests
+        run: |
+          node --check server.mjs
+          node --check lib/unified-executor.mjs
+          node --check public/app.js
+          npm test
+      - name: Verify no external account requests in unified executor
+        shell: bash
+        run: |
+          if grep -En 'fetch\(|https?\.request\(|axios|api\.bilibili\.com' lib/unified-executor.mjs; then
+            echo "Unexpected network access in unified executor"
+            exit 1
+          fi
