@@ -34,9 +34,9 @@ function drawStatus(d){
  $('subhead').textContent=blocked?'B站接口熔断生效。可以离线复核分类，但无法同步账号。':'页面仅使用本机数据。';
  $('memberships').textContent=format(d.snapshot.memberships);
  $('unique').textContent=format(d.snapshot.distinctBvids);
- $('classified').textContent=format(d.workflow.stats.classified+d.workflow.stats.manual);
+ $('classified').textContent=format(d.workflow.stats.classified+d.workflow.stats.manual+d.workflow.stats.assistantReviewed);
  $('copied').textContent=format(d.sync.historicalCopies);
- $('coverage').textContent=d.snapshot.memberships?Math.round(100*(d.workflow.stats.classified+d.workflow.stats.manual)/d.snapshot.distinctBvids)+'%':'—';
+ $('coverage').textContent=d.snapshot.memberships?Math.round(100*(d.workflow.stats.classified+d.workflow.stats.manual+d.workflow.stats.assistantReviewed)/d.snapshot.distinctBvids)+'%':'—';
  const topics=$('topics');topics.replaceChildren();
  const data=d.workflow.stats.topics;const max=Math.max(1,...Object.values(data));
  Object.entries(data).sort((a,b)=>b[1]-a[1]).forEach(([name,count])=>{

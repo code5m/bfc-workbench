@@ -3,7 +3,7 @@ let libraryPage=1,libraryTotal=0;
 async function loadLibraryMeta(){
  const r=await fetch('/api/local-catalog');if(!r.ok)throw Error('本地目录概况不可读取');
  const meta=await r.json();
- $('library-stats').textContent=meta.totals.distinctBvids+' 个视频 · '+meta.categories.length+' 个主题 · '+meta.totals.needingReview+' 待复核 · '+meta.totals.unobservedFolders+' 个目录待补采';
+ $('library-stats').textContent=meta.totals.distinctBvids+' 个视频 · '+meta.categories.length+' 个主题 · '+meta.totals.assistedClassifications+' 已AI复核 · '+meta.totals.needingReview+' 待复核' · '+meta.totals.unobservedFolders+' 个目录待补采';
  const chooser=$('library-category'),old=chooser.value;chooser.replaceChildren();
  const all=elem(chooser,'option','全部主题');all.value='';
  for(const c of meta.categories){const opt=elem(chooser,'option',c.name+' ('+c.count+')');opt.value=c.name;}
