@@ -8,6 +8,7 @@ import {deriveWorkflow,pageVideos,validTopic,TARGETS} from './lib/workflow.mjs';
 import {assessCompletion} from './lib/completion.mjs';
 import {auditStrategy} from './lib/strategy-audit.mjs';
 import {buildLocalCatalogFromDir,saveLocalCatalog} from './lib/local-catalog.mjs';
+import {updateProgress} from './lib/progress-report.mjs';
 import {UnifiedExecutor} from './lib/unified-executor.mjs';
 
 const root=dirname(fileURLToPath(import.meta.url));
@@ -63,8 +64,8 @@ async function getWorkflow(){
  return deriveWorkflow({inventory:src.inventory,classification:src.classification,
   description:src.desc,overrides:src.overrides,guard:src.guard,copySummary:src.copy});
 }
-const mime={'/':'text/html; charset=utf-8','/app.js':'application/javascript; charset=utf-8','/local-library.js':'application/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8'};
-const assets={'/':'index.html','/app.js':'app.js','/local-library.js':'local-library.js','/style.css':'style.css'};
+const mime={'/':'text/html; charset=utf-8','/app.js':'application/javascript; charset=utf-8','/local-library.js':'application/javascript; charset=utf-8','/progress-report.js':'application/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8'};
+const assets={'/':'index.html','/app.js':'app.js','/local-library.js':'local-library.js','/progress-report.js':'progress-report.js','/style.css':'style.css'};
 function sendJson(res,code,obj,extra={}){
  res.writeHead(code,{'Content-Type':'application/json; charset=utf-8',...extra});res.end(JSON.stringify(obj));
 }
@@ -161,6 +162,7 @@ export function createApp(){
    if(req.method==='GET'&&route==='/api/status'){sendJson(res,200,await snapshot());return;}
    if(req.method==='GET'&&route==='/api/completion'){sendJson(res,200,(await snapshot()).completion);return;}
    if(req.method==='GET'&&route==='/api/strategy-audit'){sendJson(res,200,(await snapshot()).strategyAudit);return;}
+   if(req.method==='GET'&&route==='/api/progress-report'){sendJson(res,200,await updateProgress(dataDir));return;}
    if(req.method==='GET'&&route==='/api/local-catalog'){
     const c=await buildLocalCatalogFromDir(dataDir);
     sendJson(res,200,{totals:c.totals,categories:c.categories,unobserved:c.unobserved,folders:c.folders});return;
