@@ -7,6 +7,7 @@ import {fileURLToPath} from 'node:url';
 import {deriveWorkflow,pageVideos,validTopic,TARGETS} from './lib/workflow.mjs';
 import {assessCompletion} from './lib/completion.mjs';
 import {auditStrategy} from './lib/strategy-audit.mjs';
+import {auditHistoricalGapsFromDir} from './lib/historical-gaps.mjs';
 import {buildLocalCatalogFromDir,saveLocalCatalog} from './lib/local-catalog.mjs';
 import {updateProgress} from './lib/progress-report.mjs';
 import {prepareEvidence,currentEvidence} from './lib/evidence-service.mjs';
@@ -66,8 +67,8 @@ async function getWorkflow(){
  return deriveWorkflow({inventory:src.inventory,classification:src.classification,
   description:src.desc,overrides:src.overrides,assistant:src.assistant,guard:src.guard,copySummary:src.copy});
 }
-const mime={'/':'text/html; charset=utf-8','/app.js':'application/javascript; charset=utf-8','/local-library.js':'application/javascript; charset=utf-8','/progress-report.js':'application/javascript; charset=utf-8','/evidence-review.js':'application/javascript; charset=utf-8','/full-review.js':'application/javascript; charset=utf-8','/expanded-triage.js':'application/javascript; charset=utf-8','/navigation.js':'application/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8'};
-const assets={'/':'index.html','/app.js':'app.js','/local-library.js':'local-library.js','/progress-report.js':'progress-report.js','/evidence-review.js':'evidence-review.js','/full-review.js':'full-review.js','/expanded-triage.js':'expanded-triage.js','/navigation.js':'navigation.js','/style.css':'style.css'};
+const mime={'/':'text/html; charset=utf-8','/app.js':'application/javascript; charset=utf-8','/local-library.js':'application/javascript; charset=utf-8','/progress-report.js':'application/javascript; charset=utf-8','/evidence-review.js':'application/javascript; charset=utf-8','/full-review.js':'application/javascript; charset=utf-8','/expanded-triage.js':'application/javascript; charset=utf-8','/navigation.js':'application/javascript; charset=utf-8','/historical-gaps.js':'application/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8'};
+const assets={'/':'index.html','/app.js':'app.js','/local-library.js':'local-library.js','/progress-report.js':'progress-report.js','/evidence-review.js':'evidence-review.js','/full-review.js':'full-review.js','/expanded-triage.js':'expanded-triage.js','/navigation.js':'navigation.js','/historical-gaps.js':'historical-gaps.js','/style.css':'style.css'};
 function sendJson(res,code,obj,extra={}){
  res.writeHead(code,{'Content-Type':'application/json; charset=utf-8',...extra});res.end(JSON.stringify(obj));
 }
@@ -164,6 +165,18 @@ export function createApp(){
    if(req.method==='GET'&&route==='/api/status'){sendJson(res,200,await snapshot());return;}
    if(req.method==='GET'&&route==='/api/completion'){sendJson(res,200,(await snapshot()).completion);return;}
    if(req.method==='GET'&&route==='/api/strategy-audit'){sendJson(res,200,(await snapshot()).strategyAudit);return;}
+   if(req.method==='GET'&&route==='/api/historical-gaps'){
+    const report=await auditHistoricalGapsFromDir(dataDir);
+    sendJson(res,200,{totals:report.totals,folders:report.folders,
+      warning:report.warning,generatedAt:report.generatedAt});return;
+   }
+   if(req.method==='GET'&&route==='/api/historical-gaps/items'){
+    const report=await auditHistoricalGapsFromDir(dataDir);
+    const folder=url.searchParams.get('folder')||'';
+    const page=Math.max(1,Math.min(1000,parseInt(url.searchParams.get('page')||'1',10)||1));
+    const rows=report.rows.filter(v=>!folder||v.originalFolders.includes(folder));
+    sendJson(res,200,{page,total:rows.length,items:rows.slice((page-1)*25,page*25)});return;
+   }
    if(req.method==='GET'&&route==='/api/expanded-triage'){
     const result=await readJson('expanded-local-triage.json');
     if(!result){sendJson(res,404,{error:'expanded_triage_missing'});return;}

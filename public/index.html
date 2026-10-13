@@ -18,6 +18,18 @@
   <p class="completion-note">全部门禁真实通过前，状态永远是“未完成”。 <a href="https://github.com/code5m/bilibili-favorites-workbench/blob/main/docs/COMPLETION_CONTRACT.md" target="_blank" rel="noopener noreferrer">查看正式交付契约 ↗</a></p>
 </section>
 <div class="columns" data-view="overview"><section class="panel"><div class="section-head"><h3>主题分布</h3><span>按唯一 BV 统计</span></div><div id="topics"></div></section><section class="panel"><div class="section-head"><h3>完成路线</h3><span>真实执行状态</span></div><div id="actions"></div></section></div>
+<section class="panel" id="recovery-panel" data-view="sync">
+<div class="section-head"><h3>账号访问与安全恢复</h3><span id="recovery-state" class="completion-state unmet">加载中</span></div>
+<p class="muted">登录成功只是第一步，不能据此认定收藏接口恢复。同步功能保持关闭，直到官方访问方式和实时回读已被核实。</p>
+<div class="delivery-stats">
+<div><span>保护状态</span><strong id="recovery-guard">—</strong></div>
+<div><span>未完整采集目录</span><strong id="recovery-folders">—</strong></div>
+<div><span>实时回读确认</span><strong id="recovery-verified">—</strong></div>
+<div><span>本地账号写入</span><strong id="recovery-writes">—</strong></div>
+</div>
+<p id="recovery-detail" class="muted" aria-live="polite"></p>
+<p class="muted">恢复条件：确认官方网页收藏内容正常、核实账号访问权限与获准接口，再由单一执行器进行有界读取。若出现 401、403、412 或 429，立即终止，不重试刷接口。</p>
+</section>
 <section class="panel" id="executor-panel" data-view="sync">
 <div class="section-head"><h3>统一执行器 · 离线任务中心</h3><span id="executor-phase" class="completion-state unmet">未准备</span></div>
 <p class="muted">一个入口执行全部本地分类任务：P0 默认夹优先、BV 去重、断点保存、暂停恢复、取消、审计。当前不连接 B站、不修改账号。</p>
@@ -94,5 +106,16 @@
 <p id="review-message" class="muted" aria-live="polite"></p><div id="review-items"></div>
 <div class="pagination"><span id="review-total"></span><button id="prev" type="button" class="outlined">上一页</button><button id="next" type="button" class="outlined">下一页</button></div></section>
 <section class="panel" data-view="sync"><div class="section-head"><h3>收藏夹扫描覆盖率</h3><span id="coverage-label"></span></div><div id="folders"></div></section>
+<section class="panel" id="historical-gap-panel" data-view="sync">
+<div class="section-head"><h3>历史快照补采清单</h3><span id="historical-gap-summary">加载中</span></div>
+<p class="muted">这些 BV 来自旧收藏夹成员记录，暂未出现在最新本地清单。不能证明目前仍已收藏，也不等于已成功同步。</p>
+<div class="work-controls"><label for="historical-gap-folder">原收藏夹</label>
+<select id="historical-gap-folder"><option value="">全部历史目录</option></select></div>
+<div id="historical-gap-items"></div>
+<div class="pagination"><span id="historical-gap-page">—</span>
+<button type="button" id="historical-gap-prev" class="outlined">上一页</button>
+<button type="button" id="historical-gap-next" class="outlined">下一页</button></div>
+<div id="historical-gap-message" class="muted" aria-live="polite"></div>
+</section>
 <footer>仅本地读写分类复核记录 · 不会请求 B站账号写入接口 · 用户数据不上传 GitHub · <span id="updated">尚未更新</span></footer>
-</main></div><script src="/app.js" defer></script><script src="/local-library.js" defer></script><script src="/progress-report.js" defer></script><script src="/evidence-review.js" defer></script><script src="/full-review.js" defer></script><script src="/expanded-triage.js" defer></script><script src="/navigation.js" defer></script></body></html>
+</main></div><script src="/app.js" defer></script><script src="/local-library.js" defer></script><script src="/progress-report.js" defer></script><script src="/evidence-review.js" defer></script><script src="/full-review.js" defer></script><script src="/expanded-triage.js" defer></script><script src="/navigation.js" defer></script><script src="/historical-gaps.js" defer></script></body></html>
