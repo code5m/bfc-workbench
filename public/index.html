@@ -106,6 +106,26 @@
 <p id="review-message" class="muted" aria-live="polite"></p><div id="review-items"></div>
 <div class="pagination"><span id="review-total"></span><button id="prev" type="button" class="outlined">上一页</button><button id="next" type="button" class="outlined">下一页</button></div></section>
 <section class="panel" data-view="sync"><div class="section-head"><h3>收藏夹扫描覆盖率</h3><span id="coverage-label"></span></div><div id="folders"></div></section>
+<section class="panel" id="saved-page-import-panel" data-view="sync">
+<div class="section-head"><h3>安全补采 · 导入已保存的网页</h3><span id="saved-page-import-count">尚无导入</span></div>
+<p class="muted"><strong>不会自动请求 B站，也不会写入 B站账号。</strong> 如果你在官网登录的收藏夹页面能够正常翻页，可以将已加载的那一页用浏览器「另存为 → 网页，仅 HTML」保存为 HTML，再从这里选择文件，或导入已有的 JSON 收藏列表。只抽取视频 BV 号、标题和原收藏夹，忽略原始网页里的其他信息。</p>
+<div class="work-controls">
+<label for="saved-page-import-folder">对应的原收藏夹</label>
+<select id="saved-page-import-folder"><option value="">请选择收藏夹</option></select>
+<label for="saved-page-import-file">已保存的网页/列表</label>
+<input id="saved-page-import-file" type="file" accept=".html,.htm,.json,text/html,application/json">
+<button id="saved-page-import-save" class="outlined" type="button" disabled>确认暂存到本地</button>
+</div>
+<p id="saved-page-import-preview" class="muted">请选择本地文件，预览确认后才会暂存。不支持自动翻页；网页保存文件不一定包含所有已显示视频。</p>
+<div class="delivery-stats">
+<div><span>离线暂存视频（去重）</span><strong id="saved-page-import-total">0</strong></div>
+<div><span>与当前本地快照不重合</span><strong id="saved-page-import-new">0</strong></div>
+<div><span>已导入的网页/列表</span><strong id="saved-page-import-pages">0</strong></div>
+<div><span>B站实时同步成功</span><strong id="saved-page-import-sync">—</strong></div>
+</div>
+<div id="saved-page-import-items"></div>
+<div id="saved-page-import-message" class="muted" aria-live="polite"></div>
+</section>
 <section class="panel" id="historical-gap-panel" data-view="sync">
 <div class="section-head"><h3>历史快照补采清单</h3><span id="historical-gap-summary">加载中</span></div>
 <p class="muted">这些 BV 来自旧收藏夹成员记录，暂未出现在最新本地清单。不能证明目前仍已收藏，也不等于已成功同步。</p>
@@ -118,4 +138,4 @@
 <div id="historical-gap-message" class="muted" aria-live="polite"></div>
 </section>
 <footer>仅本地读写分类复核记录 · 不会请求 B站账号写入接口 · 用户数据不上传 GitHub · <span id="updated">尚未更新</span></footer>
-</main></div><script src="/app.js" defer></script><script src="/local-library.js" defer></script><script src="/progress-report.js" defer></script><script src="/evidence-review.js" defer></script><script src="/full-review.js" defer></script><script src="/expanded-triage.js" defer></script><script src="/navigation.js" defer></script><script src="/historical-gaps.js" defer></script></body></html>
+</main></div><script src="/app.js" defer></script><script src="/local-library.js" defer></script><script src="/progress-report.js" defer></script><script src="/evidence-review.js" defer></script><script src="/full-review.js" defer></script><script src="/expanded-triage.js" defer></script><script src="/navigation.js" defer></script><script src="/historical-gaps.js" defer></script><script src="/saved-page-import.js" type="module"></script></body></html>

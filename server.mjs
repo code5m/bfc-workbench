@@ -8,6 +8,7 @@ import {deriveWorkflow,pageVideos,validTopic,TARGETS} from './lib/workflow.mjs';
 import {assessCompletion} from './lib/completion.mjs';
 import {auditStrategy} from './lib/strategy-audit.mjs';
 import {auditHistoricalGapsFromDir} from './lib/historical-gaps.mjs';
+import {validateSavedPageInput,initialSavedPageStore,applySavedPageImport,summarizeSavedPageStore,loadSavedPageStore,saveSavedPageStore} from './lib/saved-page-import.mjs';
 import {buildLocalCatalogFromDir,saveLocalCatalog} from './lib/local-catalog.mjs';
 import {updateProgress} from './lib/progress-report.mjs';
 import {prepareEvidence,currentEvidence} from './lib/evidence-service.mjs';
@@ -67,15 +68,15 @@ async function getWorkflow(){
  return deriveWorkflow({inventory:src.inventory,classification:src.classification,
   description:src.desc,overrides:src.overrides,assistant:src.assistant,guard:src.guard,copySummary:src.copy});
 }
-const mime={'/':'text/html; charset=utf-8','/app.js':'application/javascript; charset=utf-8','/local-library.js':'application/javascript; charset=utf-8','/progress-report.js':'application/javascript; charset=utf-8','/evidence-review.js':'application/javascript; charset=utf-8','/full-review.js':'application/javascript; charset=utf-8','/expanded-triage.js':'application/javascript; charset=utf-8','/navigation.js':'application/javascript; charset=utf-8','/historical-gaps.js':'application/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8'};
-const assets={'/':'index.html','/app.js':'app.js','/local-library.js':'local-library.js','/progress-report.js':'progress-report.js','/evidence-review.js':'evidence-review.js','/full-review.js':'full-review.js','/expanded-triage.js':'expanded-triage.js','/navigation.js':'navigation.js','/historical-gaps.js':'historical-gaps.js','/style.css':'style.css'};
+const mime={'/saved-page-import.js':'application/javascript; charset=utf-8','/saved-page-parser.js':'application/javascript; charset=utf-8','/':'text/html; charset=utf-8','/app.js':'application/javascript; charset=utf-8','/local-library.js':'application/javascript; charset=utf-8','/progress-report.js':'application/javascript; charset=utf-8','/evidence-review.js':'application/javascript; charset=utf-8','/full-review.js':'application/javascript; charset=utf-8','/expanded-triage.js':'application/javascript; charset=utf-8','/navigation.js':'application/javascript; charset=utf-8','/historical-gaps.js':'application/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8'};
+const assets={'/saved-page-import.js':'saved-page-import.js','/saved-page-parser.js':'saved-page-parser.js','/':'index.html','/app.js':'app.js','/local-library.js':'local-library.js','/progress-report.js':'progress-report.js','/evidence-review.js':'evidence-review.js','/full-review.js':'full-review.js','/expanded-triage.js':'expanded-triage.js','/navigation.js':'navigation.js','/historical-gaps.js':'historical-gaps.js','/style.css':'style.css'};
 function sendJson(res,code,obj,extra={}){
  res.writeHead(code,{'Content-Type':'application/json; charset=utf-8',...extra});res.end(JSON.stringify(obj));
 }
-async function loadSmallBody(req){
+async function loadSmallBody(req,maxBytes=4096){
  let size=0;const parts=[];
  for await(const ch of req){
-  size+=ch.length;if(size>4096)throw new Error('request_body_too_large');
+  size+=ch.length;if(size>maxBytes)throw new Error('request_body_too_large');
   parts.push(ch);
  }
  try{return JSON.parse(Buffer.concat(parts).toString('utf8'));}catch{throw new Error('invalid_json');}
@@ -140,6 +141,23 @@ async function saveReview(input){
  reviewQueue=op.catch(()=>{});
  return op;
 }
+let pageImportQueue=Promise.resolve();
+async function saveSavedPageImport(input){
+ const task=pageImportQueue.then(async()=>{
+  const inventory=await readJson('inventory-rescan-v2.json');
+  const folders=(inventory?.folder_status||[]).map(f=>String(f.title||''));
+  const checked=validateSavedPageInput(input,folders);
+  const before=await loadSavedPageStore(dataDir);
+  const result=applySavedPageImport(before,checked,new Date().toISOString());
+  if(!result.alreadyImported)await saveSavedPageStore(dataDir,result.store);
+  return {...summarizeSavedPageStore(result.store,inventory?.members||[]),
+   importedNewBvids:result.imported,alreadyImported:result.alreadyImported,
+   submittedEntries:checked.entries.length,
+   note:'离线暂存，不代表 B站当前收藏或已同步'};
+ });
+ pageImportQueue=task.catch(()=>{});
+ return task;
+}
 function localhostOk(req){
  const addr=req.headers.host||'';
  return addr==='127.0.0.1:'+req.socket.localPort;
@@ -165,6 +183,33 @@ export function createApp(){
    if(req.method==='GET'&&route==='/api/status'){sendJson(res,200,await snapshot());return;}
    if(req.method==='GET'&&route==='/api/completion'){sendJson(res,200,(await snapshot()).completion);return;}
    if(req.method==='GET'&&route==='/api/strategy-audit'){sendJson(res,200,(await snapshot()).strategyAudit);return;}
+   if(req.method==='GET'&&route==='/api/saved-page-import'){
+    const inventory=await readJson('inventory-rescan-v2.json');
+    const store=await loadSavedPageStore(dataDir);
+    sendJson(res,200,summarizeSavedPageStore(store,inventory?.members||[]));return;
+   }
+   if(req.method==='GET'&&route==='/api/saved-page-import/items'){
+    const inventory=await readJson('inventory-rescan-v2.json');
+    const known=new Set((inventory?.members||[]).map(x=>x.bvid));
+    const store=await loadSavedPageStore(dataDir);
+    const folder=url.searchParams.get('folder')||'';
+    const page=Math.max(1,Math.min(1000,parseInt(url.searchParams.get('page')||'1',10)||1));
+    const entries=store.items.filter(x=>!folder||x.observations.some(y=>y.folder===folder));
+    const items=entries.slice((page-1)*25,page*25).map(x=>({
+      bvid:x.bvid,title:x.title,
+      sourceFolders:[...new Set(x.observations.map(y=>y.folder))],
+      alreadyInSnapshot:known.has(x.bvid),accountSyncVerified:false
+    }));
+    sendJson(res,200,{total:entries.length,page,items});return;
+   }
+   if(req.method==='POST'&&route==='/api/saved-page-import'){
+    if(!reviewAuth(req)){sendJson(res,403,{error:'csrf_or_origin_mismatch'});return;}
+    try{
+      const input=await loadSmallBody(req,100000);
+      sendJson(res,200,await saveSavedPageImport(input));
+    }catch(e){sendJson(res,400,{error:String(e.message).slice(0,160)});}
+    return;
+   }
    if(req.method==='GET'&&route==='/api/historical-gaps'){
     const report=await auditHistoricalGapsFromDir(dataDir);
     sendJson(res,200,{totals:report.totals,folders:report.folders,
