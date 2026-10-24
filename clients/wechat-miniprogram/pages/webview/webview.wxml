@@ -1,0 +1,1 @@
+<web-view wx:if="{{url}}" src="{{url}}"></web-view><view wx:else class="empty">专题暂无可观看视频，或服务端尚未返回数据。</view>

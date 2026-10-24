@@ -6,7 +6,7 @@ test('all dashboard controls map to explicit UI elements',async()=>{
  const app=createApp();await new Promise(ok=>app.listen(0,'127.0.0.1',ok));
  try{
   const b='http://127.0.0.1:'+app.address().port;
-  const html=await (await fetch(b)).text();
+  const html=await (await fetch(b+'/manage')).text();
   for(const id of ['refresh-all','show-audit','backup-review','restore-review','undo-review','scan-help','sync-help','cleanup-help','export-plan','review-search','review-filter','prev','next']){
    assert.match(html,new RegExp('id="'+id+'"'));
   }

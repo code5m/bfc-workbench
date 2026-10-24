@@ -1,0 +1,5 @@
+{
+  "pages": ["pages/index/index", "pages/webview/webview"],
+  "window": {"navigationBarTitleText": "自选", "navigationBarBackgroundColor": "#101827", "navigationBarTextStyle": "white"},
+  "sitemapLocation": "sitemap.json"
+}

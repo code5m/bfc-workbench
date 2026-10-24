@@ -1,5 +1,5 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>B站收藏夹整理工作台</title><link rel="stylesheet" href="/style.css"></head><body><div id="app">
-<header><div class="eyebrow">PERSONAL KNOWLEDGE SYSTEM · 本地优先</div><h1>B站收藏夹整理工作台</h1><p>收藏资产、整理复核和账号同步的可核验进度。</p><span id="access" class="pill">读取本地状态中...</span></header>
+<header><div class="eyebrow">PERSONAL KNOWLEDGE SYSTEM · 本地优先</div><h1>采集与同步管理</h1><p>这里保留采集、账号同步和历史审核记录；历史库存数字不代表当前专题库的分类进度。</p><a href="/#topics">← 返回专题视频库</a><span id="access" class="pill">读取本地状态中...</span></header>
 <nav class="primary-nav" aria-label="工作台主导航"><a href="#overview" data-view-link="overview">总览</a><a href="#classification" data-view-link="classification">分类管理</a><a href="#sync" data-view-link="sync">同步管理</a></nav>
 <main><section class="hero" data-view="overview"><div><div class="eyebrow">当前运行状态</div><h2 id="headline">正在读取本地快照</h2><p id="subhead">不访问 B站接口，不改变原有收藏。</p></div><div class="round" id="coverage">—</div></section>
 <div class="stats" data-view="overview"><article><span>已保存收藏关系</span><strong id="memberships">—</strong><small>离线快照，不等于账号全量</small></article><article><span>不同视频 BV 号</span><strong id="unique">—</strong><small>跨收藏夹去重统计</small></article><article><span>视频分类建议</span><strong id="classified">—</strong><small>唯一 BV 口径，未全部审核</small></article><article><span>首轮成功复制</span><strong id="copied">—</strong><small>第二轮尚未完成</small></article></div>
@@ -16,6 +16,16 @@
   <div class="completion-gate-header"><strong>G1–G8 强制验收清单</strong><span id="completion-gate-count">—</span></div>
   <div id="completion-gates"></div>
   <p class="completion-note">全部门禁真实通过前，状态永远是“未完成”。 <a href="https://github.com/code5m/bilibili-favorites-workbench/blob/main/docs/COMPLETION_CONTRACT.md" target="_blank" rel="noopener noreferrer">查看正式交付契约 ↗</a></p>
+</section>
+<section class="panel" id="live-browser-panel" data-view="overview">
+  <div class="section-head"><h3>当前浏览器实时读取</h3><span id="live-browser-state" class="completion-state unmet">核验中</span></div>
+  <div class="delivery-stats">
+    <div><span>页面宣称总数</span><strong id="live-browser-reported">—</strong></div>
+    <div><span>已采集页面</span><strong id="live-browser-pages">—</strong></div>
+    <div><span>实际渲染条目</span><strong id="live-browser-items">—</strong></div>
+    <div><span>待核验差异</span><strong id="live-browser-shortfall">—</strong></div>
+  </div>
+  <p id="live-browser-detail" class="muted">只读浏览器数据，不执行账号写入。</p>
 </section>
 <div class="columns" data-view="overview"><section class="panel"><div class="section-head"><h3>主题分布</h3><span>按唯一 BV 统计</span></div><div id="topics"></div></section><section class="panel"><div class="section-head"><h3>完成路线</h3><span>真实执行状态</span></div><div id="actions"></div></section></div>
 <section class="panel" id="recovery-panel" data-view="sync">
@@ -106,6 +116,7 @@
 <p id="review-message" class="muted" aria-live="polite"></p><div id="review-items"></div>
 <div class="pagination"><span id="review-total"></span><button id="prev" type="button" class="outlined">上一页</button><button id="next" type="button" class="outlined">下一页</button></div></section>
 <section class="panel" data-view="sync"><div class="section-head"><h3>收藏夹扫描覆盖率</h3><span id="coverage-label"></span></div><div id="folders"></div></section>
+<section class="panel" id="monitor-panel" data-view="sync"><div class="section-head"><h3>B站差异监测</h3><span id="monitor-state" class="completion-state unmet">读取中</span></div><p class="muted">只读取已保存的授权快照；快照不完整时只显示待核实差额，不判定删除。</p><div class="delivery-stats"><div><span>页面报告</span><strong id="monitor-reported">—</strong></div><div><span>实际卡片</span><strong id="monitor-read">—</strong></div><div><span>唯一 BV</span><strong id="monitor-unique">—</strong></div><div><span>未解释差额</span><strong id="monitor-gap">—</strong></div></div><div class="work-controls"><button type="button" id="monitor-run" class="outlined">运行一次只读对账</button><label><input type="checkbox" id="monitor-enabled">启用配置</label><label>间隔（分钟）<input id="monitor-interval" type="number" min="5" step="5" value="60"></label></div><p id="monitor-message" class="muted" aria-live="polite"></p></section>
 <section class="panel" id="saved-page-import-panel" data-view="sync">
 <div class="section-head"><h3>安全补采 · 导入已保存的网页</h3><span id="saved-page-import-count">尚无导入</span></div>
 <p class="muted"><strong>不会自动请求 B站，也不会写入 B站账号。</strong> 如果你在官网登录的收藏夹页面能够正常翻页，可以将已加载的那一页用浏览器「另存为 → 网页，仅 HTML」保存为 HTML，再从这里选择文件，或导入已有的 JSON 收藏列表。只抽取视频 BV 号、标题和原收藏夹，忽略原始网页里的其他信息。</p>
@@ -138,4 +149,4 @@
 <div id="historical-gap-message" class="muted" aria-live="polite"></div>
 </section>
 <footer>仅本地读写分类复核记录 · 不会请求 B站账号写入接口 · 用户数据不上传 GitHub · <span id="updated">尚未更新</span></footer>
-</main></div><script src="/app.js" defer></script><script src="/local-library.js" defer></script><script src="/progress-report.js" defer></script><script src="/evidence-review.js" defer></script><script src="/full-review.js" defer></script><script src="/expanded-triage.js" defer></script><script src="/navigation.js" defer></script><script src="/historical-gaps.js" defer></script><script src="/saved-page-import.js" type="module"></script></body></html>
+</main></div><script src="/app.js" defer></script><script src="/monitor.js" defer></script><script src="/local-library.js" defer></script><script src="/progress-report.js" defer></script><script src="/evidence-review.js" defer></script><script src="/full-review.js" defer></script><script src="/expanded-triage.js" defer></script><script src="/navigation.js" defer></script><script src="/historical-gaps.js" defer></script><script src="/saved-page-import.js" type="module"></script></body></html>

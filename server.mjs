@@ -14,13 +14,18 @@ import {updateProgress} from './lib/progress-report.mjs';
 import {prepareEvidence,currentEvidence} from './lib/evidence-service.mjs';
 import {UnifiedExecutor} from './lib/unified-executor.mjs';
 import {reviewFromDir,saveDeepReview} from './lib/complete-local-review.mjs';
+import {loadWorkbenchState,migrateWorkbenchState,restoreWorkbenchState,saveWorkbenchLibrary,summarizeWorkbenchState,updatePlaybackProgress} from './lib/workbench-store.mjs';
+import {compareWorkbenchSnapshot} from './lib/workbench-diff.mjs';
+import {acceptReadbackPage} from './lib/browser-readback.mjs';
+import {loadMonitor,saveMonitorConfig,recordMonitorRun} from './lib/workbench-monitor.mjs';
 
 const root=dirname(fileURLToPath(import.meta.url));
 const dataDir=process.env.BILIBILI_FAVORITES_DATA_DIR || join(homedir(),'Documents','Bilibili-Favorites-Review');
 const host='127.0.0.1',port=Number(process.env.PORT||4198);
-const csrf=randomBytes(32).toString('hex');
+let csrf=randomBytes(32).toString('hex');
 const executor=new UnifiedExecutor({dataDir,batchSize:40});
 const readJson=async(name)=>{try{return JSON.parse(await readFile(join(dataDir,name),'utf8'));}catch{return null;}};
+const readCurrentCapture=async()=>await readJson('browser-readback-current.json')||await readJson('browser-live-capture.json');
 
 export function summarize({inventory,classification,guard,copy,desc}={}){
  const records=inventory?.members||[], folders=inventory?.folder_status||[], topics=classification?.summary?.categories||{};
@@ -43,18 +48,25 @@ export function summarize({inventory,classification,guard,copy,desc}={}){
  };
 }
 
+export function summarizeBrowserCapture(capture){
+ const pages=Object.entries(capture?.pages||{}).map(([page,value])=>({page:Number(page),items:Array.isArray(value?.items)?value.items.length:0})).sort((a,b)=>a.page-b.page);
+ const items=pages.reduce((sum,page)=>sum+page.items,0);
+ const diff=compareWorkbenchSnapshot({videos:{}},capture);
+ return {source:capture?.source||null,capturedAt:diff.capturedAt,pages:pages.length,firstPage:pages[0]?.page||null,lastPage:pages.at(-1)?.page||null,items,reportedTotal:diff.reportedTotal,shortfall:diff.unexplainedGap,complete:diff.completeness==='complete',duplicatePages:diff.duplicatePages,counts:pages};
+}
 async function readSources(){
- const [inventory,classification,guard,copy,desc,overrides,finalEvidence,assistant]=await Promise.all([
+ const [inventory,classification,guard,copy,desc,overrides,finalEvidence,assistant,liveCapture]=await Promise.all([
   readJson('inventory-rescan-v2.json'),readJson('v3-classification.json'),
   readJson('account-access-guard.json'),readJson('copy-summary.json'),
   readJson('description-review.json'),readJson('manual-review-overrides.json'),
-  readJson('final-acceptance-evidence.json'),readJson('local-ai-reviewed-decisions.json')
+  readJson('final-acceptance-evidence.json'),readJson('local-ai-reviewed-decisions.json'),readCurrentCapture()
  ]);
- return {inventory,classification,guard,copy,desc,overrides,finalEvidence,assistant};
+ return {inventory,classification,guard,copy,desc,overrides,finalEvidence,assistant,liveCapture};
 }
 export async function snapshot(){
  const src=await readSources();
  const summary=summarize(src);
+ summary.liveBrowserCapture=summarizeBrowserCapture(src.liveCapture);
  const workflow=deriveWorkflow({inventory:src.inventory,classification:src.classification,
    description:src.desc,overrides:src.overrides,assistant:src.assistant,guard:src.guard,copySummary:src.copy});
  summary.workflow={stats:workflow.stats,milestones:workflow.milestones};
@@ -68,8 +80,8 @@ async function getWorkflow(){
  return deriveWorkflow({inventory:src.inventory,classification:src.classification,
   description:src.desc,overrides:src.overrides,assistant:src.assistant,guard:src.guard,copySummary:src.copy});
 }
-const mime={'/saved-page-import.js':'application/javascript; charset=utf-8','/saved-page-parser.js':'application/javascript; charset=utf-8','/':'text/html; charset=utf-8','/app.js':'application/javascript; charset=utf-8','/local-library.js':'application/javascript; charset=utf-8','/progress-report.js':'application/javascript; charset=utf-8','/evidence-review.js':'application/javascript; charset=utf-8','/full-review.js':'application/javascript; charset=utf-8','/expanded-triage.js':'application/javascript; charset=utf-8','/navigation.js':'application/javascript; charset=utf-8','/historical-gaps.js':'application/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8'};
-const assets={'/saved-page-import.js':'saved-page-import.js','/saved-page-parser.js':'saved-page-parser.js','/':'index.html','/app.js':'app.js','/local-library.js':'local-library.js','/progress-report.js':'progress-report.js','/evidence-review.js':'evidence-review.js','/full-review.js':'full-review.js','/expanded-triage.js':'expanded-triage.js','/navigation.js':'navigation.js','/historical-gaps.js':'historical-gaps.js','/style.css':'style.css'};
+const mime={'/saved-page-import.js':'application/javascript; charset=utf-8','/saved-page-parser.js':'application/javascript; charset=utf-8','/monitor.js':'application/javascript; charset=utf-8','/':'text/html; charset=utf-8','/app.js':'application/javascript; charset=utf-8','/local-library.js':'application/javascript; charset=utf-8','/progress-report.js':'application/javascript; charset=utf-8','/evidence-review.js':'application/javascript; charset=utf-8','/full-review.js':'application/javascript; charset=utf-8','/expanded-triage.js':'application/javascript; charset=utf-8','/navigation.js':'application/javascript; charset=utf-8','/historical-gaps.js':'application/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8'};
+const assets={'/saved-page-import.js':'saved-page-import.js','/saved-page-parser.js':'saved-page-parser.js','/monitor.js':'monitor.js','/':'index.html','/app.js':'app.js','/local-library.js':'local-library.js','/progress-report.js':'progress-report.js','/evidence-review.js':'evidence-review.js','/full-review.js':'full-review.js','/expanded-triage.js':'expanded-triage.js','/navigation.js':'navigation.js','/historical-gaps.js':'historical-gaps.js','/style.css':'style.css'};
 function sendJson(res,code,obj,extra={}){
  res.writeHead(code,{'Content-Type':'application/json; charset=utf-8',...extra});res.end(JSON.stringify(obj));
 }
@@ -168,6 +180,7 @@ function reviewAuth(req){
    req.headers['content-type']?.split(';')[0]==='application/json' &&
    req.headers['x-local-csrf']===csrf;
 }
+function ownerReadAuth(req){return req.headers['x-local-csrf']===csrf;}
 
 export function createApp(){
  return createServer(async(req,res)=>{
@@ -180,7 +193,49 @@ export function createApp(){
   const url=new URL(req.url||'/','http://127.0.0.1');
   const route=url.pathname;
   try{
+   if(req.method==='GET'&&route==='/readback-tool'){
+    res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end('<!doctype html><meta charset="utf-8"><title>保存授权回读</title><h1>保存授权回读</h1><label>本轮快照<textarea id="capture" rows="12" cols="70"></textarea></label><button id="save">保存到本机</button><p id="result"></p><script type="module" src="/readback-tool.js"></script>');return;
+   }
+   if(req.method==='GET'&&route==='/readback-tool.js'){
+    res.writeHead(200,{'Content-Type':'application/javascript; charset=utf-8'});res.end(await readFile(join(root,'public','readback-tool.js')));return;
+   }
+   if(req.method==='POST'&&route==='/api/readback/import'){
+    if(!reviewAuth(req)){sendJson(res,403,{error:'csrf_or_origin_mismatch'});return;}
+    try{
+     const input=await loadSmallBody(req,5_000_000);let capture=null;
+     for(const [page,value] of Object.entries(input.pages||{}))capture=acceptReadbackPage(capture,{...input,page:Number(page),renderedPage:Number(page),items:value.items});
+     if(!capture)throw Error('empty_capture');
+     capture.traversalFinished=input.traversalFinished===true;
+     const diff=compareWorkbenchSnapshot(await loadWorkbenchState(dataDir),capture);
+     await atomicJson(join(dataDir,'browser-readback-'+capture.scanId+'.json'),capture);
+     if(capture.traversalFinished&&Object.keys(capture.pages).length===capture.expectedPages)await atomicJson(join(dataDir,'browser-readback-current.json'),capture);
+     sendJson(res,200,{ok:true,scanId:capture.scanId,pages:Object.keys(capture.pages).length,cards:diff.readCardCount,unique:diff.remoteUniqueBvidCount,gap:diff.unexplainedGap});
+    }catch(error){sendJson(res,400,{error:error.message});}return;
+   }
+   if(req.method==='GET'&&route==='/api/library-current'){const data=await readJson('browser-live-reviewed-classification.json');if(!data){sendJson(res,404,{error:'classification_unavailable'});return;}sendJson(res,200,data);return;}
+   if(req.method==='GET'&&['/','/studio','/studio.js','/studio.css','/topic-recipes.js','/library-state.js'].includes(route)){
+    const file=route==='/library-state.js'?'library-state.js':route==='/topic-recipes.js'?'topic-recipes.js':route==='/studio.js'?'studio.js':route==='/studio.css'?'studio.css':'studio.html';
+    res.writeHead(200,{'Content-Type':file.endsWith('.js')?'application/javascript; charset=utf-8':file.endsWith('.css')?'text/css; charset=utf-8':'text/html; charset=utf-8'});res.end(await readFile(join(root,'public',file)));return;
+   }
+   if(req.method==='GET'&&route==='/manage'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end(await readFile(join(root,'public','index.html')));return;}
    if(req.method==='GET'&&route==='/api/status'){sendJson(res,200,await snapshot());return;}
+   if(req.method==='GET'&&(route==='/api/browser-capture'||route==='/browser-capture')){
+    const encoded=url.searchParams.get('payload');
+    if(!encoded||encoded.length>20000){sendJson(res,400,{error:'invalid_browser_capture'});return;}
+    let input;
+    try{input=JSON.parse(encoded);}catch{sendJson(res,400,{error:'invalid_browser_capture_json'});return;}
+    if(!/^[a-zA-Z0-9_-]{8,80}$/.test(input?.scanId||'')){
+     sendJson(res,400,{error:'invalid_browser_capture_shape'});return;
+    }
+    const name='browser-readback-'+input.scanId+'.json';
+    const path=join(dataDir,name);
+    let previous;
+    try{previous=acceptReadbackPage(await readJson(name),input);}
+    catch(error){sendJson(res,409,{error:error.message});return;}
+    await atomicJson(path,previous);
+    if(route==='/browser-capture'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end('<!doctype html><title>Capture received</title>');}
+    else sendJson(res,200,{ok:true,page:input.page,items:input.items.length,pages:Object.keys(previous.pages).length});return;
+   }
    if(req.method==='GET'&&route==='/api/completion'){sendJson(res,200,(await snapshot()).completion);return;}
    if(req.method==='GET'&&route==='/api/strategy-audit'){sendJson(res,200,(await snapshot()).strategyAudit);return;}
    if(req.method==='GET'&&route==='/api/saved-page-import'){
@@ -299,12 +354,108 @@ export function createApp(){
     return;
    }
    if(req.method==='GET'&&route==='/api/health'){sendJson(res,200,{ok:true,localOnly:true,bilibiliNetworkRequests:0});return;}
+   if(req.method==='GET'&&route==='/api/capabilities'){
+    sendJson(res,200,{version:1,product:'自选',backend:{topics:true,chapters:true,notes:true,manualCompletion:true,realPlaybackProgress:false,backupRestore:true,revisionConflicts:true},bilibili:{accountWrites:false,readSnapshotOnly:true,officialPlaybackUrl:true,completeSnapshot:false},monitor:{manualRun:true,scheduledRun:true,currentCompleteness:'partial_or_short_pages'},privateResearch:{invalidVideos:true,ownerSessionRequired:true},platforms:{pc:{source:true,verified:true},wechatMiniProgram:{source:true,buildVerified:false},android:{source:true,buildVerified:false},ios:{source:true,buildVerified:false},harmony:{source:true,buildVerified:false}}});return;
+   }
+   if(req.method==='GET'&&route==='/api/workbench/state'){
+    if(!ownerReadAuth(req)){sendJson(res,403,{error:'owner_session_required'});return;}
+    const state=await loadWorkbenchState(dataDir);
+    sendJson(res,200,{ok:true,summary:summarizeWorkbenchState(state),state});return;
+   }
+   if(req.method==='GET'&&route==='/api/workbench/videos'){
+    if(!ownerReadAuth(req)){sendJson(res,403,{error:'owner_session_required'});return;}
+    const state=await loadWorkbenchState(dataDir);
+    const query=(url.searchParams.get('q')||'').trim().toLocaleLowerCase('zh-CN').slice(0,90);
+    const topicId=url.searchParams.get('topic')||'';
+    const category=url.searchParams.get('category')||'';
+    const page=Math.max(1,Number(url.searchParams.get('page')||1)||1);
+    const limit=Math.max(1,Math.min(100,Number(url.searchParams.get('limit')||40)||40));
+    const topic=state.library.topics.find(item=>item.id===topicId);
+    const topicItems=new Set(topic?.items||[]);
+    const rows=Object.values(state.videos).filter(video=>{
+     const categoryMatch=!category||state.library.categories[video.bvid]===category;
+     const topicMatch=!topicId||topicItems.has(video.bvid);
+     const queryMatch=!query||(video.title+' '+video.bvid+' '+(video.author||'')).toLocaleLowerCase('zh-CN').includes(query);
+     return categoryMatch&&topicMatch&&queryMatch;
+    }).map(video=>({...video,category:state.library.categories[video.bvid]||null,watched:Boolean(state.library.watched[video.bvid])}));
+    sendJson(res,200,{page,limit,total:rows.length,items:rows.slice((page-1)*limit,page*limit),revision:state.revision||0});return;
+   }
+   if(req.method==='GET'&&route==='/api/workbench/diff'){
+    if(!ownerReadAuth(req)){sendJson(res,403,{error:'owner_session_required'});return;}
+    const state=await loadWorkbenchState(dataDir), capture=await readCurrentCapture();
+    if(!capture){sendJson(res,404,{error:'browser_snapshot_unavailable'});return;}
+    sendJson(res,200,{ok:true,diff:compareWorkbenchSnapshot(state,capture)});return;
+   }
+   if(req.method==='GET'&&route==='/api/workbench/monitor'){
+    if(!ownerReadAuth(req)){sendJson(res,403,{error:'owner_session_required'});return;}
+    sendJson(res,200,{ok:true,monitor:await loadMonitor(dataDir)});return;
+   }
+   if(req.method==='GET'&&route==='/api/workbench/research/invalid'){
+    if(!ownerReadAuth(req)){sendJson(res,403,{error:'owner_session_required'});return;}
+    const review=await readJson('complete-local-review.json');
+    if(!review){sendJson(res,404,{error:'invalid_research_unavailable'});return;}
+    const page=Math.max(1,Number(url.searchParams.get('page')||1)||1),limit=Math.max(1,Math.min(100,Number(url.searchParams.get('limit')||30)||30));
+    const rows=review.rows.filter(row=>row.originalDecision==='invalid').map(row=>({bvid:row.bvid,title:row.title||'未知',status:row.status,confidence:row.confidence,basis:row.basis,topicHint:row.topicHint||null,descriptionAvailable:Boolean(row.descriptionAvailable),originalFolders:row.originalFolders||[]}));
+    sendJson(res,200,{visibility:'owner-only',page,limit,total:rows.length,items:rows.slice((page-1)*limit,page*limit),generatedAt:review.createdAt||null});return;
+   }
+   if(req.method==='PUT'&&route==='/api/workbench/monitor'){
+    if(!reviewAuth(req)){sendJson(res,403,{error:'csrf_or_origin_mismatch'});return;}
+    try{const input=await loadSmallBody(req);sendJson(res,200,{ok:true,monitor:await saveMonitorConfig(dataDir,input)});}
+    catch(e){sendJson(res,400,{error:String(e.message).slice(0,160)});}return;
+   }
+   if(req.method==='POST'&&route==='/api/workbench/monitor/run'){
+    if(!reviewAuth(req)){sendJson(res,403,{error:'csrf_or_origin_mismatch'});return;}
+    const state=await loadWorkbenchState(dataDir),capture=await readCurrentCapture();
+    if(!capture){sendJson(res,409,{error:'browser_snapshot_unavailable'});return;}
+    const diff=compareWorkbenchSnapshot(state,capture),monitor=await recordMonitorRun(dataDir,diff);
+    sendJson(res,200,{ok:true,diff,monitor});return;
+   }
+   if(req.method==='PUT'&&route==='/api/workbench/state'){
+    if(!reviewAuth(req)){sendJson(res,403,{error:'csrf_or_origin_mismatch'});return;}
+    try{
+     const input=await loadSmallBody(req,2_000_000), source=await readJson('browser-live-reviewed-classification.json');
+     const state=await saveWorkbenchLibrary(dataDir,input.library,input.expectedRevision,source?.records||[]);
+     sendJson(res,200,{ok:true,summary:summarizeWorkbenchState(state)});
+    }catch(e){
+     if(e.message==='workbench_revision_conflict'){sendJson(res,409,{error:e.message,summary:summarizeWorkbenchState(e.current)});}
+     else sendJson(res,400,{error:String(e.message).slice(0,160)});
+    }
+    return;
+   }
+   if(req.method==='POST'&&route==='/api/workbench/progress'){
+    if(!reviewAuth(req)){sendJson(res,403,{error:'csrf_or_origin_mismatch'});return;}
+    try{const input=await loadSmallBody(req),source=await readJson('browser-live-reviewed-classification.json');const state=await updatePlaybackProgress(dataDir,input,source?.records||[]);sendJson(res,200,{ok:true,revision:state.revision,progress:state.library.progress[input.bvid]});}
+    catch(e){if(e.message==='workbench_revision_conflict')sendJson(res,409,{error:e.message,summary:summarizeWorkbenchState(e.current)});else sendJson(res,400,{error:String(e.message).slice(0,160)});}return;
+   }
+   if(req.method==='GET'&&route==='/api/workbench/backup'){
+    if(!ownerReadAuth(req)){sendJson(res,403,{error:'owner_session_required'});return;}
+    const state=await loadWorkbenchState(dataDir);sendJson(res,200,{type:'workbench_backup',version:1,state}, {'Content-Disposition':'attachment; filename="self-curated-workbench-backup.json"'});return;
+   }
+   if(req.method==='POST'&&route==='/api/workbench/restore'){
+    if(!reviewAuth(req)){sendJson(res,403,{error:'csrf_or_origin_mismatch'});return;}
+    try{const input=await loadSmallBody(req,5_000_000),source=await readJson('browser-live-reviewed-classification.json');const state=await restoreWorkbenchState(dataDir,input.state,source?.records||[]);sendJson(res,200,{ok:true,summary:summarizeWorkbenchState(state),previousBackupAvailable:true});}
+    catch(e){sendJson(res,400,{error:String(e.message).slice(0,160)});}return;
+   }
+   if(req.method==='POST'&&route==='/api/workbench/migrate'){
+    if(!reviewAuth(req)){sendJson(res,403,{error:'csrf_or_origin_mismatch'});return;}
+    try{
+     const input=await loadSmallBody(req,2_000_000);
+     const source=await readJson('browser-live-reviewed-classification.json');
+     const result=await migrateWorkbenchState(dataDir,input,source?.records||[]);
+     sendJson(res,200,{ok:true,alreadyImported:result.alreadyImported,importedVideos:result.importedVideos,summary:summarizeWorkbenchState(result.state)});
+    }catch(e){sendJson(res,400,{error:String(e.message).slice(0,160)});}
+    return;
+   }
    if(req.method==='POST'&&route==='/api/review/restore'){
     if(!reviewAuth(req)){sendJson(res,403,{error:'csrf_or_origin_mismatch'});return;}
     try{const input=await loadSmallBody(req);sendJson(res,200,await restoreReview(input));}
     catch(e){sendJson(res,400,{error:e.message});}return;
    }
-   if(req.method==='GET'&&route==='/api/session'){sendJson(res,200,{token:csrf,categories:Object.keys(TARGETS)});return;}
+   if(req.method==='GET'&&route==='/api/session'){sendJson(res,200,{token:csrf,ownerId:'local-owner',categories:Object.keys(TARGETS)});return;}
+   if(req.method==='POST'&&route==='/api/session/logout'){
+    if(!ownerReadAuth(req)){sendJson(res,403,{error:'owner_session_required'});return;}
+    csrf=randomBytes(32).toString('hex');sendJson(res,200,{ok:true,loggedOut:true});return;
+   }
    if(req.method==='GET'&&route==='/api/videos'){
     const workflow=await getWorkflow();
     sendJson(res,200,pageVideos(workflow,{
@@ -348,5 +499,17 @@ export function createApp(){
  });
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
- createApp().listen(port,host,()=>console.log('Bilibili Favorites Workbench http://'+host+':'+port));
+ const server=createApp();
+ server.listen(port,host,()=>console.log('Bilibili Favorites Workbench http://'+host+':'+port));
+ let monitorRunning=false;
+ const monitorTimer=setInterval(async()=>{
+  if(monitorRunning)return;
+  monitorRunning=true;
+  try{
+   const monitor=await loadMonitor(dataDir),last=monitor.runs.at(-1),interval=monitor.config.intervalMinutes;
+   const due=monitor.config.enabled&&interval&&(!last||Date.now()-Date.parse(last.runAt)>=interval*60_000);
+   if(due){const state=await loadWorkbenchState(dataDir),capture=await readCurrentCapture();if(capture)await recordMonitorRun(dataDir,compareWorkbenchSnapshot(state,capture));}
+  }catch(error){console.error('Monitor scheduler failed:',error.message)}finally{monitorRunning=false;}
+ },60_000);
+ monitorTimer.unref();
 }

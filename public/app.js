@@ -61,6 +61,14 @@ function drawStatus(d){
  $('coverage-label').textContent=d.folders.filter(f=>f.complete).length+'/'+d.folders.length+' 个文件夹完成遍历';
  $('local-review-stats').textContent='待复核 '+format(d.workflow.stats.conflict+d.workflow.stats.descriptionReview+d.workflow.stats.unclassified)+' 条 · 冲突 '+d.workflow.stats.conflict+' 条 · 本地确认 '+d.workflow.stats.manual+' 条';
  drawCompletion(d.completion);
+ const live=d.liveBrowserCapture||{};
+ $('live-browser-reported').textContent=format(live.reportedTotal);
+ $('live-browser-pages').textContent=(live.pages??0)+'/119';
+ $('live-browser-items').textContent=format(live.items);
+ $('live-browser-shortfall').textContent=format(live.shortfall);
+ $('live-browser-state').textContent=live.complete?'已完整读取':'存在差异，继续核验';
+ $('live-browser-state').className='completion-state '+(live.complete?'passed':'unmet');
+ $('live-browser-detail').textContent=live.complete?'已读取浏览器页面宣称的全部条目。':'浏览器页面已逐页接通；实际 DOM 条目少于页面总数，差异不会被补造或标记为完成。';
  $('updated').textContent='最近刷新：'+new Date().toLocaleString('zh-CN');
 }
 async function refresh(){
