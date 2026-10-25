@@ -1,7 +1,7 @@
 import {buildStarterTopics} from './topic-recipes.js';
 import {validateLibraryState,nextVideo,followingVideo,addToTopic,moveVideo,refreshCategoryTopics} from './library-state.js';
 const $=id=>document.getElementById(id),key='self-curated-library-v1';
-let data,rows=[],page=1,selected=new Set(),active=null,editing=null,sessionToken=null,syncTimer=null,serverRevision=null;
+let data,rows=[],page=1,selected=new Set(),active=null,editing=null,sessionToken=null,syncTimer=null,serverRevision=null,displayMode=localStorage.getItem('bfc-view-mode')||'preview';
 let state;try{state=JSON.parse(localStorage.getItem(key))||{topics:[],categories:{},watched:{},last:null};}catch{state={topics:[],categories:{},watched:{},last:null};}
 const save=()=>{localStorage.setItem(key,JSON.stringify(state));if(sessionToken){clearTimeout(syncTimer);syncTimer=setTimeout(syncServer,250);}};
 async function syncServer(){
@@ -19,18 +19,18 @@ function menus(){if(!state.recipesInitialized){state.topics.unshift(...buildStar
 function recordOpen(r){state.last=r.bvid;state.lastTopic=active&&state.topics.some(t=>t.id===active&&t.items.includes(r.bvid))?active:null;save();}
 function openVideo(r){if(!r)return;recordOpen(r);window.open('https://www.bilibili.com/video/'+encodeURIComponent(r.bvid),'_blank','noopener,noreferrer');if(location.hash.startsWith('#topic/'))detail();}
 function video(r,playlistIndex=null){
- const box=el('div','','video'),check=document.createElement('input');check.type='checkbox';
+ const box=el('article','','video video-'+displayMode),check=document.createElement('input');check.type='checkbox';
  check.checked=playlistIndex===null?selected.has(r.bvid):!!state.watched[r.bvid];
  check.setAttribute('aria-label',playlistIndex===null?'选择 '+r.title:'已看完 '+r.title);
  check.onchange=()=>{
   if(playlistIndex===null){check.checked?selected.add(r.bvid):selected.delete(r.bvid);$('selection-count').textContent=`已选 ${selected.size} 条`;}
   else{state.watched[r.bvid]=check.checked;save();detail();}
  };
- box.append(check);const info=el('div','','info'),a=el('a',r.title);
+ box.append(check);if(displayMode==='preview'&&playlistIndex===null){const cover=document.createElement('img');cover.className='video-cover';cover.loading='lazy';cover.alt='';cover.src=r.pic||`https://images.weserv.nl/?url=i0.hdslb.com/bfs/archive/${r.bvid}.jpg`;cover.onerror=()=>{cover.removeAttribute('src');cover.classList.add('cover-fallback');};box.append(cover);}const info=el('div','','info'),a=el('a',r.title);
  a.href='https://www.bilibili.com/video/'+encodeURIComponent(r.bvid);a.target='_blank';a.rel='noopener noreferrer';
  a.onclick=()=>{recordOpen(r);if(playlistIndex!==null)detail();};
  info.append(a,el('small',r.bvid+' · '+category(r)+(r.confidence==='low'?' · 低置信度倾向':'')));
- const evidence=el('details',''),summary=el('summary','分类依据');evidence.append(summary,el('p',r.reason||'本地分类'));info.append(evidence);box.append(info);
+ if(displayMode!=='titles'){const evidence=el('details',''),summary=el('summary','分类依据');evidence.append(summary,el('p',r.reason||'本地分类'));info.append(evidence);}box.append(info);
  if(playlistIndex!==null){
   const t=state.topics.find(x=>x.id===active),chap=document.createElement('select');chap.setAttribute('aria-label','视频章节：'+r.title);
   option(chap,'','未分章节');for(const c of t.chapters)option(chap,c,c);chap.value=t.sections[r.bvid]||'';
@@ -44,7 +44,7 @@ function video(r,playlistIndex=null){
  }else{const b=el('button','观看');b.onclick=()=>openVideo(r);box.append(b);}
  return box;
 }
-function library(){const q=$('search').value.trim().toLowerCase(),cat=$('filter').value,low=$('confidence').value;const list=rows.filter(r=>(!cat||category(r)===cat)&&(!low||r.confidence===low)&&(!q||(r.title+' '+r.bvid).toLowerCase().includes(q)));const max=Math.max(1,Math.ceil(list.length/40));page=Math.min(page,max);$('videos').replaceChildren(...list.slice((page-1)*40,page*40).map(r=>video(r)));$('pages').textContent=`${list.length} 条 · ${page} / ${max} 页`;$('selection-count').textContent=`已选 ${selected.size} 条`;$('prev').disabled=page===1;$('next').disabled=page===max;$('select-page').checked=false;}
+function library(){const q=$('search').value.trim().toLowerCase(),cat=$('filter').value,low=$('confidence').value;const list=rows.filter(r=>(!cat||category(r)===cat)&&(!low||r.confidence===low)&&(!q||(r.title+' '+r.bvid).toLowerCase().includes(q)));const max=Math.max(1,Math.ceil(list.length/40));page=Math.min(page,max);$('videos').dataset.mode=displayMode;$('videos').replaceChildren(...list.slice((page-1)*40,page*40).map(r=>video(r)));$('pages').textContent=`${list.length} 条 · ${page} / ${max} 页`;$('selection-count').textContent=`已选 ${selected.size} 条`;$('prev').disabled=page===1;$('next').disabled=page===max;$('select-page').checked=false;}
 function bookshelf(){const fragment=document.createDocumentFragment();for(const t of state.topics){const card=el('article','','card');card.tabIndex=0;card.setAttribute('role','button');card.append(el('small',`${t.items.length} 个视频 · ${t.chapters.length} 个章节`),el('h3',t.name),el('p',t.description));card.onclick=()=>{active=t.id;location.hash='topic/'+t.id;};card.onkeydown=e=>{if(e.key==='Enter')card.click();};fragment.append(card);}$('topics').replaceChildren(fragment);}
 function detail(){
  const t=state.topics.find(x=>x.id===active);if(!t){location.hash='topics';return;}
@@ -72,6 +72,7 @@ function renderResume(container){
  if(t){const link=el('a','回到「'+t.name+'」');link.href='#topic/'+t.id;box.append(link);const next=followingVideo(t,last.bvid,state.watched);if(next){const b=el('button','下一节');b.onclick=()=>{active=t.id;openVideo(rows.find(r=>r.bvid===next));};box.append(b);}}
  container.append(box);
 }
+function setupViewMode(){const toolbar=$('search')?.parentElement;if(!toolbar||$('view-mode'))return;const label=document.createElement('label');label.className='view-mode-label';label.textContent='观看方式';const select=document.createElement('select');select.id='view-mode';select.setAttribute('aria-label','选择观看方式');for(const [value,text] of [['preview','预览卡片'],['list','紧凑列表'],['titles','仅标题']]){const option=document.createElement('option');option.value=value;option.textContent=text;select.append(option);}select.value=displayMode;select.onchange=()=>{displayMode=select.value;localStorage.setItem('bfc-view-mode',displayMode);library();};label.append(select);toolbar.append(label);}
 function navigate(){
  if(!data)return;
  const hash=location.hash.slice(1)||'topics';
@@ -80,7 +81,7 @@ function navigate(){
  for(const link of document.querySelectorAll('nav a')){if(link.getAttribute('href')==='#'+(view==='detail'?'topics':view))link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');}
  $('heading').textContent=({topics:'专题书架',library:'全部视频',detail:'专题播放列表',watch:'继续观看'})[view];
  if(view==='topics'){bookshelf();renderResume($('home-continue'));}
- if(view==='library'){menus();library();}
+ if(view==='library'){setupViewMode();menus();library();}
  if(view==='detail'){active=hash.slice(6);detail();}
  if(view==='watch')renderResume($('continue-list'));
 }
