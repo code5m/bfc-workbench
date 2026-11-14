@@ -63,7 +63,19 @@ test('persist only staged private metadata, not source page HTML',async()=>{
   await saveSavedPageStore(dir,report.store);
   const loaded=await loadSavedPageStore(dir);
   assert.deepEqual(loaded,report.store);
-  assert.equal((await stat(join(dir,'saved-page-import-staging.json'))).mode&0o777,0o600);
+  const stagedPath=join(dir,'saved-page-import-staging.json');
+  const staged=await stat(stagedPath);
+  assert.equal(staged.isFile(),true);
+  if(process.platform==='win32'){
+    // Windows stat().mode exposes DOS read-only flags, not NTFS DACLs.
+    // Verify there is no Everyone Full/Modify grant; the service launcher
+    // independently restricts its app-data directory to the current SID.
+    const {execFileSync}=await import('node:child_process');
+    const acl=execFileSync('icacls',[stagedPath],{encoding:'utf8'});
+    assert.doesNotMatch(acl,/Everyone:\\?\(I\)?:\(F\)|Everyone:\\?\(I\)?:\(M\)/i);
+  }else{
+    assert.equal(staged.mode&0o777,0o600);
+  }
   const stored=await readFile(join(dir,'saved-page-import-staging.json'),'utf8');
   assert.doesNotMatch(stored,/<html>|Cookie:|SESSDATA=/);
  }finally{await rm(dir,{recursive:true,force:true});}
