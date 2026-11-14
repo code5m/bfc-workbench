@@ -25,7 +25,15 @@ test('persists checkpoints, remains idempotent, no account requests',async()=>{
   const next=new UnifiedExecutor({dataDir:dir,batchSize:1});
   await next.resume();
   let result;
-  for(let i=0;i<40;i++){result=await next.status();if(result.phase.startsWith('offline_complete'))break;await new Promise(r=>setTimeout(r,5));}
+  // Filesystem checkpoint/rename latency is not deterministic on Windows CI.
+  // Preserve the completion/blocked assertions, but wait for the actual
+  // asynchronous pump to finish rather than assuming 200ms is always enough.
+  const deadline=Date.now()+5000;
+  while(Date.now()<deadline){
+    result=await next.status();
+    if(result.phase.startsWith('offline_complete'))break;
+    await new Promise(r=>setTimeout(r,25));
+  }
   assert.equal(result.phase,'offline_complete_account_blocked');assert.equal(result.cursor,3);
   assert.equal(result.remoteRequests,0);assert.equal(result.accountWrites,0);assert.equal(result.verifiedAccountSync,0);
   const item=JSON.parse(await readFile(join(dir,'unified-executor-job.json'),'utf8'));
