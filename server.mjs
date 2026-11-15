@@ -126,7 +126,6 @@ function secureIdentityFile(path){
  }else chmodSync(path,0o600);
 }
 function loadOrCreateServiceIdentity(directory){
- mkdirSync(directory,{recursive:true});
  // Protect the directory before inspecting or reading its identity file.
  // This prevents a different local account from replacing the token path.
  secureIdentityDirectory(directory);
