@@ -35,11 +35,14 @@ function secureIdentityFile(path){
  if(process.platform==='win32'){
   const user=process.env.USERDOMAIN&&process.env.USERNAME
    ? process.env.USERDOMAIN+'\\'+process.env.USERNAME : process.env.USERNAME;
-  if(!user)throw new Error('bfc_identity_windows_user_unavailable');
-  // Reset old explicit and inherited grants before applying the current
-  // account + SYSTEM only. The launcher independently verifies the parent DACL.
-  execFileSync('icacls.exe',[path,'/reset'],{windowsHide:true,stdio:'ignore'});
-  execFileSync('icacls.exe',[path,'/inheritance:r','/grant:r',user+':F','NT AUTHORITY\\SYSTEM:F'],
+  const systemRoot=process.env.SystemRoot||process.env.WINDIR;
+  if(!user||!systemRoot)throw new Error('bfc_identity_windows_user_unavailable');
+  const icacls=join(systemRoot,'System32','icacls.exe');
+  if(!lstatSync(icacls).isFile())throw new Error('bfc_identity_windows_acl_tool_unavailable');
+  // Never resolve ACL tooling from a caller-controlled PATH.
+  // Reset old explicit/inherited grants, then grant the current account and SYSTEM only.
+  execFileSync(icacls,[path,'/reset'],{windowsHide:true,stdio:'ignore'});
+  execFileSync(icacls,[path,'/inheritance:r','/grant:r',user+':F','NT AUTHORITY\\SYSTEM:F'],
    {windowsHide:true,stdio:'ignore'});
  }else chmodSync(path,0o600);
 }
