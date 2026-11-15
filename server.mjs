@@ -32,8 +32,10 @@ const BFC_IDENTITY_FILE='.browseros-service-identity.json';
 let csrf=randomBytes(32).toString('hex');
 
 function secureWindowsAcl(path,isDirectory){
-  const user=process.env.USERDOMAIN&&process.env.USERNAME
-   ? process.env.USERDOMAIN+'\\'+process.env.USERNAME : process.env.USERNAME;
+  const sid=process.env.BROWSEROS_USER_SID;
+  const user=sid&&/^S-1-[0-9-]+$/.test(sid) ? '*'+sid :
+   (process.env.USERDOMAIN&&process.env.USERNAME
+    ? process.env.USERDOMAIN+'\\'+process.env.USERNAME : process.env.USERNAME);
   const systemRoot=process.env.SystemRoot||process.env.WINDIR;
   if(!user||!systemRoot)throw new Error('bfc_identity_windows_user_unavailable');
   const icacls=join(systemRoot,'System32','icacls.exe');
