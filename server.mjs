@@ -1,6 +1,8 @@
 import {createServer} from 'node:http';
 import {readFile,writeFile,rename,chmod,appendFile} from 'node:fs/promises';
-import {randomBytes} from 'node:crypto';
+import {lstatSync,mkdirSync,readFileSync,writeFileSync,chmodSync} from 'node:fs';
+import {randomBytes,randomUUID,createHmac,timingSafeEqual} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import {homedir} from 'node:os';
 import {resolve,join,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -20,9 +22,62 @@ import {acceptReadbackPage} from './lib/browser-readback.mjs';
 import {loadMonitor,saveMonitorConfig,recordMonitorRun} from './lib/workbench-monitor.mjs';
 
 const root=dirname(fileURLToPath(import.meta.url));
-const dataDir=process.env.BILIBILI_FAVORITES_DATA_DIR || join(homedir(),'Documents','Bilibili-Favorites-Review');
+const defaultDataDir=process.platform==='win32'
+ ? join(process.env.LOCALAPPDATA||homedir(),'BrowserOS','Bilibili-Favorites-Review')
+ : join(homedir(),'Documents','Bilibili-Favorites-Review');
+const dataDir=process.env.BILIBILI_FAVORITES_DATA_DIR || process.env.BROWSEROS_BFC_DATA_DIR || defaultDataDir;
 const host='127.0.0.1',port=Number(process.env.PORT||4198);
+const BFC_PROTOCOL_VERSION=1;
+const BFC_IDENTITY_FILE='.browseros-service-identity.json';
 let csrf=randomBytes(32).toString('hex');
+
+function secureIdentityFile(path){
+ if(process.platform==='win32'){
+  const user=process.env.USERDOMAIN&&process.env.USERNAME
+   ? process.env.USERDOMAIN+'\\'+process.env.USERNAME : process.env.USERNAME;
+  if(!user)throw new Error('bfc_identity_windows_user_unavailable');
+  execFileSync('icacls.exe',[path,'/inheritance:r','/grant:r',user+':F','NT AUTHORITY\\SYSTEM:F'],
+   {windowsHide:true,stdio:'ignore'});
+ }else chmodSync(path,0o600);
+}
+function loadOrCreateServiceIdentity(directory){
+ mkdirSync(directory,{recursive:true});
+ const path=join(directory,BFC_IDENTITY_FILE);
+ let identity;
+ try{
+  const stat=lstatSync(path);
+  if(!stat.isFile()||stat.isSymbolicLink())throw new Error('bfc_identity_path_unsafe');
+  identity=JSON.parse(readFileSync(path,'utf8'));
+ }catch(error){
+  if(error.code!=='ENOENT')throw error;
+  identity={protocolVersion:BFC_PROTOCOL_VERSION,serviceId:randomUUID(),token:randomBytes(32).toString('hex')};
+  try{writeFileSync(path,JSON.stringify(identity),{flag:'wx',mode:0o600});}
+  catch(writeError){
+   if(writeError.code!=='EEXIST')throw writeError;
+   identity=JSON.parse(readFileSync(path,'utf8'));
+  }
+ }
+ if(identity?.protocolVersion!==BFC_PROTOCOL_VERSION ||
+    typeof identity.serviceId!=='string' ||
+    !/^[0-9a-f-]{36}$/i.test(identity.serviceId) ||
+    typeof identity.token!=='string' || !/^[0-9a-f]{64}$/i.test(identity.token)){
+  throw new Error('bfc_identity_file_invalid');
+ }
+ // Reapply the per-user ACL/mode on every service start, not only first creation.
+ secureIdentityFile(path);
+ return Object.freeze(identity);
+}
+function browserosAuth(req,identity){
+ const supplied=req.headers['x-browseros-service-token'];
+ if(typeof supplied!=='string'||!/^[0-9a-f]{64}$/i.test(supplied))return false;
+ const a=Buffer.from(supplied,'hex'),b=Buffer.from(identity.token,'hex');
+ return a.length===b.length&&timingSafeEqual(a,b);
+}
+function identityProof(identity,nonce){
+ return createHmac('sha256',Buffer.from(identity.token,'hex'))
+  .update('browseros-bfc-identity\\n'+nonce+'\\n'+identity.serviceId+'\\n'+identity.protocolVersion)
+  .digest('hex');
+}
 const executor=new UnifiedExecutor({dataDir,batchSize:40});
 const readJson=async(name)=>{try{return JSON.parse(await readFile(join(dataDir,name),'utf8'));}catch{return null;}};
 const readCurrentCapture=async()=>await readJson('browser-readback-current.json')||await readJson('browser-live-capture.json');
@@ -183,6 +238,7 @@ function reviewAuth(req){
 function ownerReadAuth(req){return req.headers['x-local-csrf']===csrf;}
 
 export function createApp(){
+ const identity=loadOrCreateServiceIdentity(dataDir);
  return createServer(async(req,res)=>{
   res.setHeader('Cache-Control','no-store');
   res.setHeader('X-Content-Type-Options','nosniff');
@@ -199,7 +255,22 @@ export function createApp(){
    if(req.method==='GET'&&route==='/readback-tool.js'){
     res.writeHead(200,{'Content-Type':'application/javascript; charset=utf-8'});res.end(await readFile(join(root,'public','readback-tool.js')));return;
    }
+   if(req.method==='GET'&&route==='/api/identity'){
+    if(!browserosAuth(req,identity)){sendJson(res,403,{error:'browseros_service_auth_required'});return;}
+    const nonce=req.headers['x-browseros-challenge'];
+    if(typeof nonce!=='string'||!/^[0-9a-f]{32}$/i.test(nonce)){
+     sendJson(res,400,{error:'invalid_identity_challenge'});return;
+    }
+    sendJson(res,200,{ok:true,serviceId:identity.serviceId,protocolVersion:identity.protocolVersion,
+     proof:identityProof(identity,nonce)});return;
+   }
+   if(req.method==='GET'&&route==='/api/browseros/session'){
+    if(!browserosAuth(req,identity)){sendJson(res,403,{error:'browseros_service_auth_required'});return;}
+    sendJson(res,200,{token:csrf,ownerId:'local-owner',categories:Object.keys(TARGETS),
+     serviceId:identity.serviceId,protocolVersion:identity.protocolVersion});return;
+   }
    if(req.method==='POST'&&route==='/api/readback/import'){
+    if(!browserosAuth(req,identity)){sendJson(res,403,{error:'browseros_service_auth_required'});return;}
     if(!reviewAuth(req)){sendJson(res,403,{error:'csrf_or_origin_mismatch'});return;}
     try{
      const input=await loadSmallBody(req,5_000_000);let capture=null;
@@ -353,9 +424,13 @@ export function createApp(){
     }catch(e){sendJson(res,409,{error:String(e.message).slice(0,160)});}
     return;
    }
-   if(req.method==='GET'&&route==='/api/health'){sendJson(res,200,{ok:true,localOnly:true,bilibiliNetworkRequests:0});return;}
+   if(req.method==='GET'&&route==='/api/health'){
+    sendJson(res,200,{ok:true,localOnly:true,bilibiliNetworkRequests:0,
+     protocolVersion:identity.protocolVersion,serviceId:identity.serviceId});return;
+   }
    if(req.method==='GET'&&route==='/api/capabilities'){
-    sendJson(res,200,{version:1,product:'自选',backend:{topics:true,chapters:true,notes:true,manualCompletion:true,realPlaybackProgress:false,backupRestore:true,revisionConflicts:true},bilibili:{accountWrites:false,readSnapshotOnly:true,officialPlaybackUrl:true,completeSnapshot:false},monitor:{manualRun:true,scheduledRun:true,currentCompleteness:'partial_or_short_pages'},privateResearch:{invalidVideos:true,ownerSessionRequired:true},platforms:{pc:{source:true,verified:true},wechatMiniProgram:{source:true,buildVerified:false},android:{source:true,buildVerified:false},ios:{source:true,buildVerified:false},harmony:{source:true,buildVerified:false}}});return;
+    sendJson(res,200,{version:identity.protocolVersion,protocolVersion:identity.protocolVersion,
+     serviceId:identity.serviceId,product:'自选',backend:{topics:true,chapters:true,notes:true,manualCompletion:true,realPlaybackProgress:false,backupRestore:true,revisionConflicts:true},bilibili:{accountWrites:false,readSnapshotOnly:true,officialPlaybackUrl:true,completeSnapshot:false},monitor:{manualRun:true,scheduledRun:true,currentCompleteness:'partial_or_short_pages'},privateResearch:{invalidVideos:true,ownerSessionRequired:true},platforms:{pc:{source:true,verified:true},wechatMiniProgram:{source:true,buildVerified:false},android:{source:true,buildVerified:false},ios:{source:true,buildVerified:false},harmony:{source:true,buildVerified:false}}});return;
    }
    if(req.method==='GET'&&route==='/api/workbench/state'){
     if(!ownerReadAuth(req)){sendJson(res,403,{error:'owner_session_required'});return;}
