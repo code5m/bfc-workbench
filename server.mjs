@@ -141,7 +141,13 @@ async function getWorkflow(){
 const mime={'/saved-page-import.js':'application/javascript; charset=utf-8','/saved-page-parser.js':'application/javascript; charset=utf-8','/monitor.js':'application/javascript; charset=utf-8','/':'text/html; charset=utf-8','/app.js':'application/javascript; charset=utf-8','/local-library.js':'application/javascript; charset=utf-8','/progress-report.js':'application/javascript; charset=utf-8','/evidence-review.js':'application/javascript; charset=utf-8','/full-review.js':'application/javascript; charset=utf-8','/expanded-triage.js':'application/javascript; charset=utf-8','/navigation.js':'application/javascript; charset=utf-8','/historical-gaps.js':'application/javascript; charset=utf-8','/style.css':'text/css; charset=utf-8'};
 const assets={'/saved-page-import.js':'saved-page-import.js','/saved-page-parser.js':'saved-page-parser.js','/monitor.js':'monitor.js','/':'index.html','/app.js':'app.js','/local-library.js':'local-library.js','/progress-report.js':'progress-report.js','/evidence-review.js':'evidence-review.js','/full-review.js':'full-review.js','/expanded-triage.js':'expanded-triage.js','/navigation.js':'navigation.js','/historical-gaps.js':'historical-gaps.js','/style.css':'style.css'};
 function sendJson(res,code,obj,extra={}){
- res.writeHead(code,{'Content-Type':'application/json; charset=utf-8',...extra});res.end(JSON.stringify(obj));
+ const body=JSON.stringify(obj);
+ res.writeHead(code,{
+  'Content-Type':'application/json; charset=utf-8',
+  'Content-Length':Buffer.byteLength(body),
+  ...extra
+ });
+ res.end(body);
 }
 async function loadSmallBody(req,maxBytes=4096){
  let size=0;const parts=[];
@@ -242,7 +248,7 @@ function ownerReadAuth(req){return req.headers['x-local-csrf']===csrf;}
 
 export function createApp(){
  const identity=loadOrCreateServiceIdentity(dataDir);
- return createServer(async(req,res)=>{
+ const server=createServer(async(req,res)=>{
   res.setHeader('Cache-Control','no-store');
   res.setHeader('X-Content-Type-Options','nosniff');
   res.setHeader('Referrer-Policy','no-referrer');
@@ -595,6 +601,12 @@ export function createApp(){
    res.writeHead(404);res.end('Not Found');
   }catch(e){sendJson(res,500,{error:'internal_error'});console.error('Request failed:',e.message);}
  });
+ // BrowserOS performs health, capability, identity, session and import on
+ // one authenticated TCP connection. Keep the socket alive long enough for
+ // this bounded local handshake; a reconnect is never used after proof.
+ server.keepAliveTimeout=15_000;
+ server.headersTimeout=20_000;
+ return server;
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  const server=createApp();
