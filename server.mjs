@@ -31,35 +31,65 @@ const BFC_PROTOCOL_VERSION=1;
 const BFC_IDENTITY_FILE='.browseros-service-identity.json';
 let csrf=randomBytes(32).toString('hex');
 
-function secureIdentityFile(path){
- if(process.platform==='win32'){
+function secureWindowsAcl(path,isDirectory){
   const user=process.env.USERDOMAIN&&process.env.USERNAME
    ? process.env.USERDOMAIN+'\\'+process.env.USERNAME : process.env.USERNAME;
   const systemRoot=process.env.SystemRoot||process.env.WINDIR;
   if(!user||!systemRoot)throw new Error('bfc_identity_windows_user_unavailable');
   const icacls=join(systemRoot,'System32','icacls.exe');
   if(!lstatSync(icacls).isFile())throw new Error('bfc_identity_windows_acl_tool_unavailable');
-  // Never resolve ACL tooling from a caller-controlled PATH.
-  // Reset old explicit/inherited grants, then grant the current account and SYSTEM only.
+  // Remove stale explicit grants as well as inherited grants before adding
+  // the current SID and SYSTEM. Resetting only the file after reading it would
+  // expose a legacy identity token during startup.
   execFileSync(icacls,[path,'/reset'],{windowsHide:true,stdio:'ignore'});
-  execFileSync(icacls,[path,'/inheritance:r','/grant:r',user+':F','NT AUTHORITY\\SYSTEM:F'],
+  const suffix=isDirectory ? ':(OI)(CI)F' : ':F';
+  execFileSync(icacls,[path,'/inheritance:r','/grant:r',user+suffix,'NT AUTHORITY\\SYSTEM'+suffix],
    {windowsHide:true,stdio:'ignore'});
+  const output=execFileSync(icacls,[path],{windowsHide:true,encoding:'utf8'});
+  const entries=output.split(/\r?\n/).filter(line=>line.includes(':('));
+  if(entries.length!==2 ||
+     !entries.some(line=>line.includes(user)) ||
+     !entries.some(line=>line.includes('NT AUTHORITY\\SYSTEM'))){
+   throw new Error('bfc_identity_windows_acl_not_exclusive');
+  }
+}
+function secureIdentityDirectory(path){
+ if(process.platform==='win32'){
+  const stat=lstatSync(path);
+  if(!stat.isDirectory()||stat.isSymbolicLink())throw new Error('bfc_data_directory_unsafe');
+  secureWindowsAcl(path,true);
+ }else chmodSync(path,0o700);
+}
+function secureIdentityFile(path){
+ if(process.platform==='win32'){
+  const stat=lstatSync(path);
+  if(!stat.isFile()||stat.isSymbolicLink())throw new Error('bfc_identity_path_unsafe');
+  secureWindowsAcl(path,false);
  }else chmodSync(path,0o600);
 }
 function loadOrCreateServiceIdentity(directory){
  mkdirSync(directory,{recursive:true});
+ // Protect the directory before inspecting or reading its identity file.
+ // This prevents a different local account from replacing the token path.
+ secureIdentityDirectory(directory);
  const path=join(directory,BFC_IDENTITY_FILE);
  let identity;
  try{
   const stat=lstatSync(path);
   if(!stat.isFile()||stat.isSymbolicLink())throw new Error('bfc_identity_path_unsafe');
+  secureIdentityFile(path);
   identity=JSON.parse(readFileSync(path,'utf8'));
  }catch(error){
   if(error.code!=='ENOENT')throw error;
   identity={protocolVersion:BFC_PROTOCOL_VERSION,serviceId:randomUUID(),token:randomBytes(32).toString('hex')};
-  try{writeFileSync(path,JSON.stringify(identity),{flag:'wx',mode:0o600});}
-  catch(writeError){
+  try{
+   writeFileSync(path,JSON.stringify(identity),{flag:'wx',mode:0o600});
+   secureIdentityFile(path);
+  }catch(writeError){
    if(writeError.code!=='EEXIST')throw writeError;
+   const stat=lstatSync(path);
+   if(!stat.isFile()||stat.isSymbolicLink())throw new Error('bfc_identity_path_unsafe');
+   secureIdentityFile(path);
    identity=JSON.parse(readFileSync(path,'utf8'));
   }
  }
@@ -69,8 +99,6 @@ function loadOrCreateServiceIdentity(directory){
     typeof identity.token!=='string' || !/^[0-9a-f]{64}$/i.test(identity.token)){
   throw new Error('bfc_identity_file_invalid');
  }
- // Reapply the per-user ACL/mode on every service start, not only first creation.
- secureIdentityFile(path);
  return Object.freeze(identity);
 }
 function browserosAuth(req,identity){
