@@ -47,6 +47,7 @@ function secureWindowsAcl(path,isDirectory){
   // Remove stale explicit grants as well as inherited grants before adding
   // the current SID and SYSTEM. Resetting only the file after reading it would
   // expose a legacy identity token during startup.
+  execFileSync(icacls,[path,'/setowner',user],{windowsHide:true,stdio:'ignore'});
   execFileSync(icacls,[path,'/reset'],{windowsHide:true,stdio:'ignore'});
   const suffix=isDirectory ? ':(OI)(CI)F' : ':F';
   execFileSync(icacls,[path,'/inheritance:r','/grant:r',user+suffix,'NT AUTHORITY\\SYSTEM'+suffix],
