@@ -287,6 +287,21 @@ export function createApp(){
      sendJson(res,200,{ok:true,scanId:capture.scanId,pages:Object.keys(capture.pages).length,cards:diff.readCardCount,unique:diff.remoteUniqueBvidCount,gap:diff.unexplainedGap});
     }catch(error){sendJson(res,400,{error:error.message});}return;
    }
+   // The separately served manual tool is same-origin and uses the local
+   // owner CSRF token. It must not bypass BrowserOS service identity checks.
+   if(req.method==='POST'&&route==='/api/manual/readback/import'){
+    if(!reviewAuth(req)){sendJson(res,403,{error:'csrf_or_origin_mismatch'});return;}
+    try{
+     const input=await loadSmallBody(req,5_000_000);let capture=null;
+     for(const [page,value] of Object.entries(input.pages||{}))capture=acceptReadbackPage(capture,{...input,page:Number(page),renderedPage:Number(page),items:value.items});
+     if(!capture)throw Error('empty_capture');
+     capture.traversalFinished=input.traversalFinished===true;
+     const diff=compareWorkbenchSnapshot(await loadWorkbenchState(dataDir),capture);
+     await atomicJson(join(dataDir,'browser-readback-'+capture.scanId+'.json'),capture);
+     if(capture.traversalFinished&&Object.keys(capture.pages).length===capture.expectedPages)await atomicJson(join(dataDir,'browser-readback-current.json'),capture);
+     sendJson(res,200,{ok:true,scanId:capture.scanId,pages:Object.keys(capture.pages).length,cards:diff.readCardCount,unique:diff.remoteUniqueBvidCount,gap:diff.unexplainedGap});
+    }catch(error){sendJson(res,400,{error:error.message});}return;
+   }
    if(req.method==='GET'&&route==='/api/library-current'){const data=await readJson('browser-live-reviewed-classification.json');if(!data){sendJson(res,404,{error:'classification_unavailable'});return;}sendJson(res,200,data);return;}
    if(req.method==='GET'&&['/','/studio','/studio.js','/studio.css','/topic-recipes.js','/library-state.js'].includes(route)){
     const file=route==='/library-state.js'?'library-state.js':route==='/topic-recipes.js'?'topic-recipes.js':route==='/studio.js'?'studio.js':route==='/studio.css'?'studio.css':'studio.html';
@@ -295,21 +310,25 @@ export function createApp(){
    if(req.method==='GET'&&route==='/manage'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end(await readFile(join(root,'public','index.html')));return;}
    if(req.method==='GET'&&route==='/api/status'){sendJson(res,200,await snapshot());return;}
    if(req.method==='GET'&&(route==='/api/browser-capture'||route==='/browser-capture')){
-    const encoded=url.searchParams.get('payload');
-    if(!encoded||encoded.length>20000){sendJson(res,400,{error:'invalid_browser_capture'});return;}
-    let input;
-    try{input=JSON.parse(encoded);}catch{sendJson(res,400,{error:'invalid_browser_capture_json'});return;}
-    if(!/^[a-zA-Z0-9_-]{8,80}$/.test(input?.scanId||'')){
-     sendJson(res,400,{error:'invalid_browser_capture_shape'});return;
-    }
-    const name='browser-readback-'+input.scanId+'.json';
-    const path=join(dataDir,name);
-    let previous;
-    try{previous=acceptReadbackPage(await readJson(name),input);}
-    catch(error){sendJson(res,409,{error:error.message});return;}
-    await atomicJson(path,previous);
-    if(route==='/browser-capture'){res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end('<!doctype html><title>Capture received</title>');}
-    else sendJson(res,200,{ok:true,page:input.page,items:input.items.length,pages:Object.keys(previous.pages).length});return;
+    sendJson(res,405,{error:'browser_capture_requires_authenticated_post'});return;
+   }
+   if(req.method==='POST'&&(route==='/api/browser-capture'||route==='/browser-capture')){
+    if(!reviewAuth(req)){sendJson(res,403,{error:'csrf_or_origin_mismatch'});return;}
+    try{
+     const input=await loadSmallBody(req,5_000_000);
+     if(!/^[a-zA-Z0-9_-]{8,80}$/.test(input?.scanId||'')){
+      sendJson(res,400,{error:'invalid_browser_capture_shape'});return;
+     }
+     const name='browser-readback-'+input.scanId+'.json';
+     let previous;
+     try{previous=acceptReadbackPage(await readJson(name),input);}
+     catch(error){sendJson(res,409,{error:error.message});return;}
+     await atomicJson(join(dataDir,name),previous);
+     if(route==='/browser-capture'){
+      res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});
+      res.end('<!doctype html><title>Capture received</title>');
+     }else sendJson(res,200,{ok:true,page:input.page,items:input.items.length,pages:Object.keys(previous.pages).length});
+    }catch(error){sendJson(res,400,{error:error.message});}return;
    }
    if(req.method==='GET'&&route==='/api/completion'){sendJson(res,200,(await snapshot()).completion);return;}
    if(req.method==='GET'&&route==='/api/strategy-audit'){sendJson(res,200,(await snapshot()).strategyAudit);return;}
