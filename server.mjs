@@ -1,6 +1,6 @@
 import {createServer} from 'node:http';
 import {readFile,writeFile,rename,chmod,appendFile} from 'node:fs/promises';
-import {lstatSync,readdirSync,mkdirSync,readFileSync,writeFileSync,chmodSync} from 'node:fs';
+import {lstatSync,readdirSync,mkdirSync,readFileSync,writeFileSync,chmodSync,realpathSync} from 'node:fs';
 import {randomBytes,randomUUID,createHmac,timingSafeEqual} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {homedir} from 'node:os';
@@ -26,7 +26,7 @@ const defaultDataDir=process.platform==='win32'
  ? join(process.env.LOCALAPPDATA||homedir(),'BrowserOS','Bilibili-Favorites-Review')
  : join(homedir(),'Documents','Bilibili-Favorites-Review');
 const dataDir=process.env.BILIBILI_FAVORITES_DATA_DIR || process.env.BROWSEROS_BFC_DATA_DIR || defaultDataDir;
-const host='127.0.0.1',port=Number(process.env.PORT||4198);
+const host='127.0.0.1',port=4198;
 const BFC_PROTOCOL_VERSION=1;
 const BFC_IDENTITY_FILE='.browseros-service-identity.json';
 let csrf=randomBytes(32).toString('hex');
@@ -55,34 +55,56 @@ function secureWindowsAcl(path,isDirectory){
    throw new Error('bfc_identity_windows_acl_not_exclusive');
   }
 }
-function secureIdentityDirectory(path){
+function normalizedWindowsPath(value){
+ let normalized=resolve(value).replaceAll('/','\\').replace(/[\\/]+$/,'').toLowerCase();
+ if(normalized.startsWith('\\\\?\\'))normalized=normalized.slice(4);
+ return normalized;
+}
+function assertNoReparsePath(path){
  const absolute=resolve(path);
  if(process.platform==='win32'){
-  // Reject reparse points in every existing ancestor, not only the leaf.
+  if(absolute.startsWith('\\\\'))throw new Error('bfc_data_directory_must_be_local');
   const volume=absolute.slice(0,3);
   let cursor=volume;
   for(const part of absolute.slice(3).split(/[\\/]+/).filter(Boolean)){
    cursor=join(cursor,part);
    try{
     const stat=lstatSync(cursor);
-    if(stat.isSymbolicLink()||(stat.attributes&0x400)!==0)throw new Error('bfc_data_directory_reparse_point');
+    if(stat.isSymbolicLink()||(stat.attributes&0x400)!==0)
+     throw new Error('bfc_data_directory_reparse_point');
+    if(normalizedWindowsPath(realpathSync.native(cursor))!==normalizedWindowsPath(cursor))
+     throw new Error('bfc_data_directory_path_redirected');
    }catch(error){if(error.code!=='ENOENT')throw error;}
   }
+ }
+}
+function secureIdentityDirectory(path){
+ const absolute=resolve(path);
+ // Check every existing ancestor before mkdir follows a path component.
+ assertNoReparsePath(absolute);
+ mkdirSync(absolute,{recursive:true});
+ assertNoReparsePath(absolute);
+ if(process.platform==='win32'){
   const stat=lstatSync(absolute);
   if(!stat.isDirectory()||stat.isSymbolicLink()||(stat.attributes&0x400)!==0)
    throw new Error('bfc_data_directory_unsafe');
-  // Existing data may predate the secure launcher. Reset every descendant's
-  // DACL to the owner/SYSTEM-only root and reject all reparse entries.
-  const pending=[absolute],objects=[];
+  // Existing data may predate the secure launcher. Reject all reparse/special
+  // descendants and bound traversal before changing any ACL.
+  const pending=[{path:absolute,depth:0}],objects=[];
+  const maxObjects=50000,maxDepth=64;
   while(pending.length){
-   const directory=pending.pop();
-   for(const entry of readdirSync(directory,{withFileTypes:true})){
-    const child=join(directory,entry.name),meta=lstatSync(child);
+   const current=pending.pop();
+   if(current.depth>maxDepth)throw new Error('bfc_data_tree_depth_limit');
+   for(const entry of readdirSync(current.path,{withFileTypes:true})){
+    const child=join(current.path,entry.name),meta=lstatSync(child);
     if(meta.isSymbolicLink()||(meta.attributes&0x400)!==0)
      throw new Error('bfc_data_tree_reparse_point');
     if(!meta.isFile()&&!meta.isDirectory())throw new Error('bfc_data_tree_special_file');
+    if(normalizedWindowsPath(realpathSync.native(child))!==normalizedWindowsPath(child))
+     throw new Error('bfc_data_tree_path_redirected');
     objects.push(child);
-    if(meta.isDirectory())pending.push(child);
+    if(objects.length>maxObjects)throw new Error('bfc_data_tree_object_limit');
+    if(meta.isDirectory())pending.push({path:child,depth:current.depth+1});
    }
   }
   secureWindowsAcl(absolute,true);
@@ -97,7 +119,9 @@ function secureIdentityDirectory(path){
 function secureIdentityFile(path){
  if(process.platform==='win32'){
   const stat=lstatSync(path);
-  if(!stat.isFile()||stat.isSymbolicLink())throw new Error('bfc_identity_path_unsafe');
+  if(!stat.isFile()||stat.isSymbolicLink()||(stat.attributes&0x400)!==0)
+   throw new Error('bfc_identity_path_unsafe');
+  assertNoReparsePath(path);
   secureWindowsAcl(path,false);
  }else chmodSync(path,0o600);
 }
@@ -110,7 +134,9 @@ function loadOrCreateServiceIdentity(directory){
  let identity;
  try{
   const stat=lstatSync(path);
-  if(!stat.isFile()||stat.isSymbolicLink())throw new Error('bfc_identity_path_unsafe');
+  if(!stat.isFile()||stat.isSymbolicLink()||(stat.attributes&0x400)!==0)
+   throw new Error('bfc_identity_path_unsafe');
+  assertNoReparsePath(path);
   secureIdentityFile(path);
   identity=JSON.parse(readFileSync(path,'utf8'));
  }catch(error){
