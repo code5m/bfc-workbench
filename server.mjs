@@ -4,7 +4,7 @@ import {lstatSync,readdirSync,mkdirSync,readFileSync,writeFileSync,chmodSync,rea
 import {randomBytes,randomUUID,createHmac,timingSafeEqual} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {homedir} from 'node:os';
-import {resolve,join,dirname} from 'node:path';
+import {resolve,join,dirname,isAbsolute} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {deriveWorkflow,pageVideos,validTopic,TARGETS} from './lib/workflow.mjs';
 import {assessCompletion} from './lib/completion.mjs';
@@ -39,10 +39,9 @@ function secureWindowsAcl(path,isDirectory){
   if(!sid||!/^S-1-[0-9-]+$/.test(sid))
    throw new Error('bfc_identity_windows_user_sid_required');
   const user='*'+sid;
-  const systemRoot=process.env.SystemRoot||process.env.WINDIR;
-  if(!systemRoot)throw new Error('bfc_identity_windows_user_unavailable');
-  const icacls=process.env.BROWSEROS_ICACLS_PATH||join(systemRoot,'System32','icacls.exe');
-  if(!isAbsolute(icacls)||!lstatSync(icacls).isFile())throw new Error('bfc_identity_windows_acl_tool_unavailable');
+  const icacls=process.env.BROWSEROS_ICACLS_PATH;
+  if(!icacls||!isAbsolute(icacls)||!lstatSync(icacls).isFile())
+   throw new Error('bfc_identity_windows_acl_tool_unavailable');
   // Remove stale explicit grants as well as inherited grants before adding
   // the current SID and SYSTEM. Resetting only the file after reading it would
   // expose a legacy identity token during startup.
