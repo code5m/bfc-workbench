@@ -97,7 +97,14 @@ test('HTTP import is localhost-only and requires anti-CSRF token',async()=>{
   const base='http://127.0.0.1:'+app.address().port;
   const json=async r=>({status:r.status,body:await r.json()});
   const session=await json(await fetch(base+'/api/session'));
-  const identity=JSON.parse(await readFile(join(dir,'.browseros-service-identity.json'),'utf8'));
+  const identityPath=join(dir,'.browseros-service-identity.json');
+  const identity=JSON.parse(await readFile(identityPath,'utf8'));
+  if(process.platform==='win32'){
+   const {execFileSync}=await import('node:child_process');
+   const acl=execFileSync('icacls.exe',[identityPath],{encoding:'utf8'});
+   assert.match(acl,/SYSTEM/i);
+   assert.doesNotMatch(acl,/Everyone|BUILTIN\\Users|Authenticated Users/i);
+  }
   const nonce='0123456789abcdef0123456789abcdef';
   const invalidChallenge=await json(await fetch(base+'/api/identity'));
   assert.equal(invalidChallenge.status,400);
