@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {createHmac} from 'node:crypto';
 import {mkdtemp,readFile,stat,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -96,6 +97,34 @@ test('HTTP import is localhost-only and requires anti-CSRF token',async()=>{
   const base='http://127.0.0.1:'+app.address().port;
   const json=async r=>({status:r.status,body:await r.json()});
   const session=await json(await fetch(base+'/api/session'));
+  const identity=JSON.parse(await readFile(join(dir,'.browseros-service-identity.json'),'utf8'));
+  const nonce='0123456789abcdef0123456789abcdef';
+  const noIdentity=await json(await fetch(base+'/api/identity',{
+   headers:{'X-BrowserOS-Challenge':nonce}
+  }));
+  assert.equal(noIdentity.status,403);
+  const proof=await json(await fetch(base+'/api/identity',{
+   headers:{
+    'X-BrowserOS-Service-Token':identity.token,
+    'X-BrowserOS-Challenge':nonce
+   }
+  }));
+  assert.equal(proof.status,200);
+  assert.equal(proof.body.serviceId,identity.serviceId);
+  assert.equal(proof.body.protocolVersion,1);
+  assert.equal(proof.body.proof,createHmac('sha256',Buffer.from(identity.token,'hex'))
+   .update('browseros-bfc-identity|'+nonce+'|'+identity.serviceId+'|1').digest('hex'));
+  const noBrowserOSSession=await json(await fetch(base+'/api/browseros/session'));
+  assert.equal(noBrowserOSSession.status,403);
+  const browserOSSession=await json(await fetch(base+'/api/browseros/session',{
+   headers:{'X-BrowserOS-Service-Token':identity.token}
+  }));
+  assert.equal(browserOSSession.status,200);
+  const noIdentityImport=await json(await fetch(base+'/api/readback/import',{
+   method:'POST',headers:{'Content-Type':'application/json',Origin:base,
+    'X-Local-CSRF':session.body.token},body:JSON.stringify({})
+  }));
+  assert.equal(noIdentityImport.status,403);
   const forbidden=await json(await fetch(base+'/api/saved-page-import',{
    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)
   }));
