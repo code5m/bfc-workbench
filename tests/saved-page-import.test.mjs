@@ -99,15 +99,11 @@ test('HTTP import is localhost-only and requires anti-CSRF token',async()=>{
   const session=await json(await fetch(base+'/api/session'));
   const identity=JSON.parse(await readFile(join(dir,'.browseros-service-identity.json'),'utf8'));
   const nonce='0123456789abcdef0123456789abcdef';
-  const noIdentity=await json(await fetch(base+'/api/identity',{
-   headers:{'X-BrowserOS-Challenge':nonce}
-  }));
-  assert.equal(noIdentity.status,403);
+  const invalidChallenge=await json(await fetch(base+'/api/identity'));
+  assert.equal(invalidChallenge.status,400);
+  // The challenge endpoint must not require or receive the shared secret.
   const proof=await json(await fetch(base+'/api/identity',{
-   headers:{
-    'X-BrowserOS-Service-Token':identity.token,
-    'X-BrowserOS-Challenge':nonce
-   }
+   headers:{'X-BrowserOS-Challenge':nonce}
   }));
   assert.equal(proof.status,200);
   assert.equal(proof.body.serviceId,identity.serviceId);
