@@ -75,7 +75,7 @@ function browserosAuth(req,identity){
 }
 function identityProof(identity,nonce){
  return createHmac('sha256',Buffer.from(identity.token,'hex'))
-  .update('browseros-bfc-identity\\n'+nonce+'\\n'+identity.serviceId+'\\n'+identity.protocolVersion)
+  .update('browseros-bfc-identity|'+nonce+'|'+identity.serviceId+'|'+identity.protocolVersion)
   .digest('hex');
 }
 const executor=new UnifiedExecutor({dataDir,batchSize:40});
