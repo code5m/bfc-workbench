@@ -97,6 +97,24 @@ test('HTTP import is localhost-only and requires anti-CSRF token',async()=>{
   const base='http://127.0.0.1:'+app.address().port;
   const json=async r=>({status:r.status,body:await r.json()});
   const session=await json(await fetch(base+'/api/session'));
+  const capture={
+   source:'authorized_browser_readback',scanId:'capture_csrf_001',
+   reportedTotal:1,expectedPages:1,page:1,renderedPage:1,
+   items:[{bvid:'BV1234567890',title:'CSRF fixture'}]
+  };
+  const legacyGet=await fetch(base+'/api/browser-capture?payload='+encodeURIComponent(JSON.stringify(capture)));
+  assert.equal(legacyGet.status,405);
+  await assert.rejects(stat(join(dir,'browser-readback-capture_csrf_001.json')),e=>e.code==='ENOENT');
+  const unauthenticatedPost=await json(await fetch(base+'/api/browser-capture',{
+   method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(capture)
+  }));
+  assert.equal(unauthenticatedPost.status,403);
+  const authenticatedPost=await json(await fetch(base+'/api/browser-capture',{
+   method:'POST',headers:{'Content-Type':'application/json',Origin:base,'X-Local-CSRF':session.body.token},
+   body:JSON.stringify(capture)
+  }));
+  assert.equal(authenticatedPost.status,200);
+  assert.equal(authenticatedPost.body.ok,true);
   const identityPath=join(dir,'.browseros-service-identity.json');
   const identity=JSON.parse(await readFile(identityPath,'utf8'));
   if(process.platform==='win32'){
