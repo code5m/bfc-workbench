@@ -1,6 +1,6 @@
 import {createServer} from 'node:http';
 import {readFile,writeFile,rename,chmod,appendFile} from 'node:fs/promises';
-import {lstatSync,mkdirSync,readFileSync,writeFileSync,chmodSync} from 'node:fs';
+import {lstatSync,readdirSync,mkdirSync,readFileSync,writeFileSync,chmodSync} from 'node:fs';
 import {randomBytes,randomUUID,createHmac,timingSafeEqual} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {homedir} from 'node:os';
@@ -54,11 +54,43 @@ function secureWindowsAcl(path,isDirectory){
   }
 }
 function secureIdentityDirectory(path){
+ const absolute=resolve(path);
  if(process.platform==='win32'){
-  const stat=lstatSync(path);
-  if(!stat.isDirectory()||stat.isSymbolicLink())throw new Error('bfc_data_directory_unsafe');
-  secureWindowsAcl(path,true);
- }else chmodSync(path,0o700);
+  // Reject reparse points in every existing ancestor, not only the leaf.
+  const volume=absolute.slice(0,3);
+  let cursor=volume;
+  for(const part of absolute.slice(3).split(/[\\/]+/).filter(Boolean)){
+   cursor=join(cursor,part);
+   try{
+    const stat=lstatSync(cursor);
+    if(stat.isSymbolicLink()||(stat.attributes&0x400)!==0)throw new Error('bfc_data_directory_reparse_point');
+   }catch(error){if(error.code!=='ENOENT')throw error;}
+  }
+  const stat=lstatSync(absolute);
+  if(!stat.isDirectory()||stat.isSymbolicLink()||(stat.attributes&0x400)!==0)
+   throw new Error('bfc_data_directory_unsafe');
+  // Existing data may predate the secure launcher. Reset every descendant's
+  // DACL to the owner/SYSTEM-only root and reject all reparse entries.
+  const pending=[absolute],objects=[];
+  while(pending.length){
+   const directory=pending.pop();
+   for(const entry of readdirSync(directory,{withFileTypes:true})){
+    const child=join(directory,entry.name),meta=lstatSync(child);
+    if(meta.isSymbolicLink()||(meta.attributes&0x400)!==0)
+     throw new Error('bfc_data_tree_reparse_point');
+    if(!meta.isFile()&&!meta.isDirectory())throw new Error('bfc_data_tree_special_file');
+    objects.push(child);
+    if(meta.isDirectory())pending.push(child);
+   }
+  }
+  secureWindowsAcl(absolute,true);
+  for(const child of objects){
+   const directory=lstatSync(child).isDirectory();
+   secureWindowsAcl(child,directory);
+  }
+ }else{
+  chmodSync(absolute,0o700);
+ }
 }
 function secureIdentityFile(path){
  if(process.platform==='win32'){
