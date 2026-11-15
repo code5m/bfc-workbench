@@ -256,7 +256,8 @@ export function createApp(){
     res.writeHead(200,{'Content-Type':'application/javascript; charset=utf-8'});res.end(await readFile(join(root,'public','readback-tool.js')));return;
    }
    if(req.method==='GET'&&route==='/api/identity'){
-    if(!browserosAuth(req,identity)){sendJson(res,403,{error:'browseros_service_auth_required'});return;}
+    // Public nonce challenge: never ask the caller to send the secret before
+    // it has authenticated this endpoint. The response is an HMAC proof.
     const nonce=req.headers['x-browseros-challenge'];
     if(typeof nonce!=='string'||!/^[0-9a-f]{32}$/i.test(nonce)){
      sendJson(res,400,{error:'invalid_identity_challenge'});return;
