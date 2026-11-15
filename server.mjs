@@ -32,14 +32,17 @@ const BFC_IDENTITY_FILE='.browseros-service-identity.json';
 let csrf=randomBytes(32).toString('hex');
 
 function secureWindowsAcl(path,isDirectory){
+  // Only the SID resolved by the trusted PowerShell launcher is accepted.
+  // DOMAIN/USERNAME environment strings are caller-controlled and are not an
+  // acceptable security principal for a private identity or data directory.
   const sid=process.env.BROWSEROS_USER_SID;
-  const user=sid&&/^S-1-[0-9-]+$/.test(sid) ? '*'+sid :
-   (process.env.USERDOMAIN&&process.env.USERNAME
-    ? process.env.USERDOMAIN+'\\'+process.env.USERNAME : process.env.USERNAME);
+  if(!sid||!/^S-1-[0-9-]+$/.test(sid))
+   throw new Error('bfc_identity_windows_user_sid_required');
+  const user='*'+sid;
   const systemRoot=process.env.SystemRoot||process.env.WINDIR;
-  if(!user||!systemRoot)throw new Error('bfc_identity_windows_user_unavailable');
-  const icacls=join(systemRoot,'System32','icacls.exe');
-  if(!lstatSync(icacls).isFile())throw new Error('bfc_identity_windows_acl_tool_unavailable');
+  if(!systemRoot)throw new Error('bfc_identity_windows_user_unavailable');
+  const icacls=process.env.BROWSEROS_ICACLS_PATH||join(systemRoot,'System32','icacls.exe');
+  if(!isAbsolute(icacls)||!lstatSync(icacls).isFile())throw new Error('bfc_identity_windows_acl_tool_unavailable');
   // Remove stale explicit grants as well as inherited grants before adding
   // the current SID and SYSTEM. Resetting only the file after reading it would
   // expose a legacy identity token during startup.
