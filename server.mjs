@@ -26,6 +26,8 @@ const defaultDataDir=process.platform==='win32'
  ? join(process.env.LOCALAPPDATA||homedir(),'BrowserOS','Bilibili-Favorites-Review')
  : join(homedir(),'Documents','Bilibili-Favorites-Review');
 const dataDir=process.env.BILIBILI_FAVORITES_DATA_DIR || process.env.BROWSEROS_BFC_DATA_DIR || defaultDataDir;
+if(process.platform==='win32'&&!isAbsolute(dataDir))
+ throw new Error('bfc_data_directory_must_be_absolute');
 const host='127.0.0.1',port=4198;
 const BFC_PROTOCOL_VERSION=1;
 const BFC_IDENTITY_FILE='.browseros-service-identity.json';
