@@ -36,6 +36,9 @@ function secureIdentityFile(path){
   const user=process.env.USERDOMAIN&&process.env.USERNAME
    ? process.env.USERDOMAIN+'\\'+process.env.USERNAME : process.env.USERNAME;
   if(!user)throw new Error('bfc_identity_windows_user_unavailable');
+  // Reset old explicit and inherited grants before applying the current
+  // account + SYSTEM only. The launcher independently verifies the parent DACL.
+  execFileSync('icacls.exe',[path,'/reset'],{windowsHide:true,stdio:'ignore'});
   execFileSync('icacls.exe',[path,'/inheritance:r','/grant:r',user+':F','NT AUTHORITY\\SYSTEM:F'],
    {windowsHide:true,stdio:'ignore'});
  }else chmodSync(path,0o600);
